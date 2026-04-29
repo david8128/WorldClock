@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk"         Version="17.11.0" />
+    <PackageReference Include="xunit"                          Version="2.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio"      Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitives</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Xunit.StaFact"                  Version="1.1.11" />
+    <PackageReference Include="FlaUI.Core"                     Version="4.0.0" />
+    <PackageReference Include="FlaUI.UIA3"                     Version="4.0.0" />
+    <PackageReference Include="FluentAssertions"               Version="6.12.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Build the main project in Release so the Debug exe lock (from a running instance) never blocks the test build. -->
+    <ProjectReference Include="..\WorldClock\WorldClock.csproj">
+      <AdditionalProperties>Configuration=Release</AdditionalProperties>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

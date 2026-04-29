@@ -1,0 +1,21 @@
+<Project>
+  <!--
+    Default the build configuration to Release when no -c flag is passed.
+    This means "dotnet build" while the app is running never conflicts with
+    the running process's file locks in bin\Debug\, because Release outputs
+    go to bin\Release\ which is a completely separate folder.
+
+    Explicit flags always win:
+      dotnet build -c Debug   -> Debug as requested
+      dotnet run              -> Debug (dotnet run default)
+      VS Code F5              -> Debug (launch profile)
+
+    NOTE: The citiesdb/ folder (Python scripts + GeoNames data) lives at the
+    REPO ROOT, not inside WorldClock/. This prevents Python venvs (which may
+    contain Linux-style broken symlinks like lib64->lib) from crashing
+    MSBuild's **/*.xaml file-system glob.
+  -->
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+  </PropertyGroup>
+</Project>

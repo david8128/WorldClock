@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>WorldClock</AssemblyName>
+    <RootNamespace>WorldClock</RootNamespace>
+    <!-- Embeds Logo.ico into the .exe so Windows shows it in the taskbar and process list -->
+    <ApplicationIcon>Images\Logo.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Images\Logo.ico"/>
+    <Resource Include="Images\Logo.png"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Allow the test project to access internal members (AcrylicHelper, AcrylicTier, etc.) -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>WorldClock.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

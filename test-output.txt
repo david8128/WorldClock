@@ -1,0 +1,216 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  WorldClock -> C:\Users\dfonsecatorres\repos\worldclock\WorldClock\bin\Release\net8.0-windows\WorldClock.dll
+  WorldClock.Tests -> C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\bin\Release\net8.0-windows\WorldClock.Tests.dll
+Test run for C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\bin\Release\net8.0-windows\WorldClock.Tests.dll (.NETCoreApp,Version=v8.0)
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:15.59]     WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasTeamLabelTextBox [FAIL]
+  Failed WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasTeamLabelTextBox [10 s]
+  Error Message:
+   System.InvalidOperationException : Sequence contains no matching element
+  Stack Trace:
+     at System.Linq.ThrowHelper.ThrowNoMatchException()
+   at System.Linq.Enumerable.First[TSource](IEnumerable`1 source, Func`2 predicate)
+   at WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasTeamLabelTextBox() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\SettingsUITests.cs:line 154
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:29.90]     WorldClock.Tests.UI.SettingsUITests.DeleteModeToggle_WhenChecked_ShowsDeleteButtonsOnCards [FAIL]
+  Failed WorldClock.Tests.UI.SettingsUITests.DeleteModeToggle_WhenChecked_ShowsDeleteButtonsOnCards [14 s]
+  Error Message:
+   System.InvalidOperationException : Sequence contains no matching element
+  Stack Trace:
+     at System.Linq.ThrowHelper.ThrowNoMatchException()
+   at System.Linq.Enumerable.First[TSource](IEnumerable`1 source, Func`2 predicate)
+   at WorldClock.Tests.UI.SettingsUITests.DeleteModeToggle_WhenChecked_ShowsDeleteButtonsOnCards() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\SettingsUITests.cs:line 215
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:42.94]     WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasThemeComboBox_WithMultipleItems [FAIL]
+  Failed WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasThemeComboBox_WithMultipleItems [9 s]
+  Error Message:
+   System.InvalidOperationException : Sequence contains no matching element
+  Stack Trace:
+     at System.Linq.ThrowHelper.ThrowNoMatchException()
+   at System.Linq.Enumerable.First[TSource](IEnumerable`1 source, Func`2 predicate)
+   at WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasThemeComboBox_WithMultipleItems() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\SettingsUITests.cs:line 289
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:01:01.46]     WorldClock.Tests.UI.SettingsUITests.SettingsWindow_OpacitySlider_ShowsPercentageLabel [FAIL]
+  Failed WorldClock.Tests.UI.SettingsUITests.SettingsWindow_OpacitySlider_ShowsPercentageLabel [18 s]
+  Error Message:
+   System.InvalidOperationException : Sequence contains no matching element
+  Stack Trace:
+     at System.Linq.ThrowHelper.ThrowNoMatchException()
+   at System.Linq.Enumerable.First[TSource](IEnumerable`1 source, Func`2 predicate)
+   at WorldClock.Tests.UI.SettingsUITests.SettingsWindow_OpacitySlider_ShowsPercentageLabel() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\SettingsUITests.cs:line 267
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:01:08.10]     WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasDeleteModeToggle [FAIL]
+  Failed WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasDeleteModeToggle [6 s]
+  Error Message:
+   System.InvalidOperationException : Sequence contains no matching element
+  Stack Trace:
+     at System.Linq.ThrowHelper.ThrowNoMatchException()
+   at System.Linq.Enumerable.First[TSource](IEnumerable`1 source, Func`2 predicate)
+   at WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasDeleteModeToggle() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\SettingsUITests.cs:line 192
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:01:17.85]     WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasCityNameTextBox [FAIL]
+  Failed WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasCityNameTextBox [9 s]
+  Error Message:
+   System.InvalidOperationException : Sequence contains no matching element
+  Stack Trace:
+     at System.Linq.ThrowHelper.ThrowNoMatchException()
+   at System.Linq.Enumerable.First[TSource](IEnumerable`1 source, Func`2 predicate)
+   at WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasCityNameTextBox() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\SettingsUITests.cs:line 118
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:01:27.67]     WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasAddCityButton [FAIL]
+  Failed WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasAddCityButton [9 s]
+  Error Message:
+   System.InvalidOperationException : Sequence contains no matching element
+  Stack Trace:
+     at System.Linq.ThrowHelper.ThrowNoMatchException()
+   at System.Linq.Enumerable.First[TSource](IEnumerable`1 source, Func`2 predicate)
+   at WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasAddCityButton() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\SettingsUITests.cs:line 172
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:01:37.41]     WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasOpacitySlider [FAIL]
+  Failed WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasOpacitySlider [9 s]
+  Error Message:
+   System.InvalidOperationException : Sequence contains no matching element
+  Stack Trace:
+     at System.Linq.ThrowHelper.ThrowNoMatchException()
+   at System.Linq.Enumerable.First[TSource](IEnumerable`1 source, Func`2 predicate)
+   at WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasOpacitySlider() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\SettingsUITests.cs:line 249
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:01:43.58]     WorldClock.Tests.UI.SettingsUITests.SettingsButton_Click_OpensSettingsWindow [FAIL]
+  Failed WorldClock.Tests.UI.SettingsUITests.SettingsButton_Click_OpensSettingsWindow [6 s]
+  Error Message:
+   Expected settingsWin not to be <null> because clicking the gear icon must open the Settings window.
+  Stack Trace:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message)
+   at FluentAssertions.Primitives.ReferenceTypeAssertions`2.NotBeNull(String because, Object[] becauseArgs)
+   at WorldClock.Tests.UI.SettingsUITests.SettingsButton_Click_OpensSettingsWindow() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\SettingsUITests.cs:line 102
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:01:53.27]     WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasTimezoneComboBox [FAIL]
+  Failed WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasTimezoneComboBox [9 s]
+  Error Message:
+   System.InvalidOperationException : Sequence contains no matching element
+  Stack Trace:
+     at System.Linq.ThrowHelper.ThrowNoMatchException()
+   at System.Linq.Enumerable.First[TSource](IEnumerable`1 source, Func`2 predicate)
+   at WorldClock.Tests.UI.SettingsUITests.SettingsWindow_HasTimezoneComboBox() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\SettingsUITests.cs:line 136
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:02:03.46]     WorldClock.Tests.UI.WorldClockUITests.App_UtcBanner_ShowsUtcOffset [FAIL]
+  Failed WorldClock.Tests.UI.WorldClockUITests.App_UtcBanner_ShowsUtcOffset [10 s]
+  Error Message:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Stack Trace:
+     at WorldClock.Tests.UI.WorldClockUITests.GetAllTextValues(AutomationElement root) in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 200
+   at WorldClock.Tests.UI.WorldClockUITests.App_UtcBanner_ShowsUtcOffset() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 81
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:02:13.80]     WorldClock.Tests.UI.WorldClockUITests.App_Cards_ShowAllExpectedCities [FAIL]
+  Failed WorldClock.Tests.UI.WorldClockUITests.App_Cards_ShowAllExpectedCities [10 s]
+  Error Message:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Stack Trace:
+     at WorldClock.Tests.UI.WorldClockUITests.GetAllTextValues(AutomationElement root) in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 200
+   at WorldClock.Tests.UI.WorldClockUITests.App_Cards_ShowAllExpectedCities() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 108
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:02:23.04]     WorldClock.Tests.UI.WorldClockUITests.App_Footer_IsVisible [FAIL]
+  Failed WorldClock.Tests.UI.WorldClockUITests.App_Footer_IsVisible [9 s]
+  Error Message:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Stack Trace:
+     at WorldClock.Tests.UI.WorldClockUITests.GetAllTextValues(AutomationElement root) in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 200
+   at WorldClock.Tests.UI.WorldClockUITests.App_Footer_IsVisible() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 187
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:02:32.44]     WorldClock.Tests.UI.WorldClockUITests.App_Time_UpdatesAutomatically_AfterTwoSeconds [FAIL]
+  Failed WorldClock.Tests.UI.WorldClockUITests.App_Time_UpdatesAutomatically_AfterTwoSeconds [9 s]
+  Error Message:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Stack Trace:
+     at WorldClock.Tests.UI.WorldClockUITests.GetAllTextValues(AutomationElement root) in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 200
+   at WorldClock.Tests.UI.WorldClockUITests.GetFirstTimeString(AutomationElement root) in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 209
+   at WorldClock.Tests.UI.WorldClockUITests.App_Time_UpdatesAutomatically_AfterTwoSeconds() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 168
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:02:41.45]     WorldClock.Tests.UI.WorldClockUITests.App_MainWindow_HasCorrectTitle [FAIL]
+  Failed WorldClock.Tests.UI.WorldClockUITests.App_MainWindow_HasCorrectTitle [9 s]
+  Error Message:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Stack Trace:
+     at WorldClock.Tests.UI.WorldClockUITests.App_MainWindow_HasCorrectTitle() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 61
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:02:49.88]     WorldClock.Tests.UI.WorldClockUITests.App_Cards_ShowUtcOffsetForEachLocation [FAIL]
+  Failed WorldClock.Tests.UI.WorldClockUITests.App_Cards_ShowUtcOffsetForEachLocation [8 s]
+  Error Message:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Stack Trace:
+     at WorldClock.Tests.UI.WorldClockUITests.GetAllTextValues(AutomationElement root) in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 200
+   at WorldClock.Tests.UI.WorldClockUITests.App_Cards_ShowUtcOffsetForEachLocation() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 148
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:02:57.60]     WorldClock.Tests.UI.WorldClockUITests.App_MainWindow_IsVisible [FAIL]
+  Failed WorldClock.Tests.UI.WorldClockUITests.App_MainWindow_IsVisible [7 s]
+  Error Message:
+   System.Exception : Could not find process with id: 22920
+---- System.ArgumentException : Process with an Id of 22920 is not running.
+  Stack Trace:
+     at FlaUI.Core.Application.FindProcess(Int32 processId)
+   at FlaUI.Core.Application.<WaitWhileMainHandleIsMissing>b__33_0()
+   at FlaUI.Core.Tools.Retry.<>c__DisplayClass12_0.<WhileTrue>b__0()
+   at FlaUI.Core.Tools.Retry.While[T](Func`1 retryMethod, Func`2 checkMethod, Nullable`1 timeout, Nullable`1 interval, Boolean throwOnTimeout, Boolean ignoreException, String timeoutMessage, Boolean lastValueOnTimeout, T defaultOnTimeout)
+   at FlaUI.Core.Tools.Retry.WhileTrue(Func`1 checkMethod, Nullable`1 timeout, Nullable`1 interval, Boolean throwOnTimeout, Boolean ignoreException, String timeoutMessage)
+   at FlaUI.Core.Application.WaitWhileMainHandleIsMissing(Nullable`1 waitTimeout)
+   at FlaUI.Core.Application.GetMainWindow(AutomationBase automation, Nullable`1 waitTimeout)
+   at WorldClock.Tests.UI.WorldClockUITests.GetWindow() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 196
+   at WorldClock.Tests.UI.WorldClockUITests.App_MainWindow_IsVisible() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 69
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+----- Inner Stack Trace -----
+   at System.Diagnostics.Process.GetProcessById(Int32 processId, String machineName)
+   at FlaUI.Core.Application.FindProcess(Int32 processId)
+[xUnit.net 00:03:04.91]     WorldClock.Tests.UI.WorldClockUITests.App_Cards_ShowTeamLabels [FAIL]
+  Failed WorldClock.Tests.UI.WorldClockUITests.App_Cards_ShowTeamLabels [7 s]
+  Error Message:
+   System.Exception : Could not find process with id: 11288
+---- System.ArgumentException : Process with an Id of 11288 is not running.
+  Stack Trace:
+     at FlaUI.Core.Application.FindProcess(Int32 processId)
+   at FlaUI.Core.Application.<WaitWhileMainHandleIsMissing>b__33_0()
+   at FlaUI.Core.Tools.Retry.<>c__DisplayClass12_0.<WhileTrue>b__0()
+   at FlaUI.Core.Tools.Retry.While[T](Func`1 retryMethod, Func`2 checkMethod, Nullable`1 timeout, Nullable`1 interval, Boolean throwOnTimeout, Boolean ignoreException, String timeoutMessage, Boolean lastValueOnTimeout, T defaultOnTimeout)
+   at FlaUI.Core.Tools.Retry.WhileTrue(Func`1 checkMethod, Nullable`1 timeout, Nullable`1 interval, Boolean throwOnTimeout, Boolean ignoreException, String timeoutMessage)
+   at FlaUI.Core.Application.WaitWhileMainHandleIsMissing(Nullable`1 waitTimeout)
+   at FlaUI.Core.Application.GetMainWindow(AutomationBase automation, Nullable`1 waitTimeout)
+   at WorldClock.Tests.UI.WorldClockUITests.GetWindow() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 196
+   at WorldClock.Tests.UI.WorldClockUITests.App_Cards_ShowTeamLabels() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 127
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+----- Inner Stack Trace -----
+   at System.Diagnostics.Process.GetProcessById(Int32 processId, String machineName)
+   at FlaUI.Core.Application.FindProcess(Int32 processId)
+[xUnit.net 00:03:13.39]     WorldClock.Tests.UI.WorldClockUITests.App_UtcBanner_ShowsTimeInHhMmSsFormat [FAIL]
+  Failed WorldClock.Tests.UI.WorldClockUITests.App_UtcBanner_ShowsTimeInHhMmSsFormat [8 s]
+  Error Message:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Stack Trace:
+     at WorldClock.Tests.UI.WorldClockUITests.GetAllTextValues(AutomationElement root) in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 200
+   at WorldClock.Tests.UI.WorldClockUITests.App_UtcBanner_ShowsTimeInHhMmSsFormat() in C:\Users\dfonsecatorres\repos\worldclock\WorldClock.Tests\UI\WorldClockUITests.cs:line 93
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+
+Failed!  - Failed:    19, Passed:   181, Skipped:     0, Total:   200, Duration: 3 m 13 s - WorldClock.Tests.dll (net8.0)

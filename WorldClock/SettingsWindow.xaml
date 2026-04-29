@@ -1,0 +1,551 @@
+<Window x:Class="WorldClock.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" Height="660" Width="520"
+        MinHeight="560" MinWidth="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        FontFamily="Segoe UI"
+        Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None"
+        x:Name="SettingsRoot">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="60"
+                      ResizeBorderThickness="6"
+                      CornerRadius="0"
+                      GlassFrameThickness="0"
+                      UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <!-- Section card -->
+        <Style x:Key="SectionCard" TargetType="Border">
+            <Setter Property="Background"   Value="{DynamicResource BrushBackgroundCard}"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding"      Value="16,14"/>
+            <Setter Property="Margin"       Value="0,0,0,10"/>
+        </Style>
+
+        <!-- Section title inside a card -->
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontFamily"   Value="Consolas"/>
+            <Setter Property="FontSize"     Value="10"/>
+            <Setter Property="FontWeight"   Value="Bold"/>
+            <Setter Property="Foreground"   Value="{DynamicResource BrushAccentCyan}"/>
+            <Setter Property="Margin"       Value="0,0,0,10"/>
+        </Style>
+
+        <!-- Primary action button -->
+        <Style x:Key="PrimaryBtn" TargetType="Button">
+            <Setter Property="Padding"         Value="18,7"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="FontSize"        Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Input text box -->
+        <Style x:Key="InputBox" TargetType="TextBox">
+            <Setter Property="Padding"                    Value="8,6"/>
+            <Setter Property="BorderThickness"            Value="1"/>
+            <Setter Property="BorderBrush"               Value="{DynamicResource BrushSeparator}"/>
+            <Setter Property="Background"                 Value="{DynamicResource BrushBackgroundMid}"/>
+            <Setter Property="Foreground"                 Value="{DynamicResource BrushTextPrimary}"/>
+            <Setter Property="FontSize"                   Value="13"/>
+            <Setter Property="CaretBrush"                 Value="{DynamicResource BrushAccentCyan}"/>
+            <Setter Property="VerticalContentAlignment"   Value="Center"/>
+        </Style>
+
+        <!-- Window control buttons (same as MainWindow) -->
+        <Style x:Key="WinCtrlBtn" TargetType="Button">
+            <Setter Property="Width"           Value="46"/>
+            <Setter Property="Height"          Value="36"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground"      Value="{DynamicResource BrushTextDim}"/>
+            <Setter Property="FontFamily"      Value="Segoe UI"/>
+            <Setter Property="FontSize"        Value="14"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WinCloseBtn" TargetType="Button" BasedOn="{StaticResource WinCtrlBtn}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#C00C0C"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{DynamicResource BrushBackgroundDark}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>  <!-- Header -->
+                <RowDefinition Height="*"/>     <!-- Content -->
+            </Grid.RowDefinitions>
+
+            <!-- HEADER — same look as MainWindow -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource BrushBackgroundMid}"
+                    Padding="20,8,0,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="⚙" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"
+                                   Foreground="{DynamicResource BrushAccentCyan}"/>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="SETTINGS"
+                                       FontSize="18" FontWeight="Bold"
+                                       Foreground="{DynamicResource BrushAccentCyan}"
+                                       FontFamily="Consolas"/>
+                            <TextBlock Text="Appearance &amp; city management"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource BrushTextDim}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                VerticalAlignment="Stretch" HorizontalAlignment="Right">
+                        <Rectangle Width="1" Fill="{DynamicResource BrushSeparator}"
+                                   Margin="6,8" VerticalAlignment="Stretch"/>
+                        <Button Content="✕" Style="{StaticResource WinCloseBtn}"
+                                Foreground="White"
+                                WindowChrome.IsHitTestVisibleInChrome="True"
+                                Click="CloseButton_Click"
+                                AutomationProperties.Name="CloseSettings"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- CONTENT -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="16,14,16,16">
+
+                    <!-- COLOUR THEME -->
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}" Text="🎨  COLOUR THEME"/>
+                            <ComboBox x:Name="ThemeComboBox"
+                                      Height="36" FontSize="13"
+                                      Background="{DynamicResource BrushBackgroundMid}"
+                                      Foreground="{DynamicResource BrushTextPrimary}"
+                                      BorderBrush="{DynamicResource BrushSeparator}"
+                                      SelectionChanged="ThemeComboBox_SelectionChanged"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- WINDOW TRANSPARENCY -->
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}" Text="💧  WINDOW TRANSPARENCY"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="56"/>
+                                </Grid.ColumnDefinitions>
+                                <Slider x:Name="OpacitySlider"
+                                        Minimum="0.10" Maximum="1.0"
+                                        SmallChange="0.05" LargeChange="0.10"
+                                        TickFrequency="0.05" IsSnapToTickEnabled="True"
+                                        Foreground="{DynamicResource BrushAccentCyan}"
+                                        VerticalAlignment="Center"
+                                        ValueChanged="OpacitySlider_ValueChanged"/>
+                                <TextBlock Grid.Column="1"
+                                           x:Name="OpacityLabel"
+                                           TextAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Margin="8,0,0,0"
+                                           FontFamily="Consolas" FontSize="13"
+                                           Foreground="{DynamicResource BrushTextPrimary}"/>
+                            </Grid>
+                            <TextBlock Text="Slide left to reveal the acrylic blur effect behind the app."
+                                       FontSize="10" Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="0,8,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ADD CITY -->
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}" Text="➕  ADD CITY"/>
+
+                            <!-- Quick-search row: same autocomplete as Time Translator -->
+                            <TextBlock Text="QUICK SEARCH" FontSize="9" FontFamily="Consolas"
+                                       Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="0,0,0,4"/>
+                            <Border Background="{DynamicResource BrushBackgroundMid}"
+                                    CornerRadius="6" Margin="0,0,0,4" Padding="10,5"
+                                    BorderBrush="{DynamicResource BrushSeparator}"
+                                    BorderThickness="1">
+                                <Grid>
+                                    <TextBox x:Name="CitySearchBox"
+                                             Background="Transparent" BorderThickness="0"
+                                             Foreground="{DynamicResource BrushTextPrimary}"
+                                             FontSize="12" CaretBrush="{DynamicResource BrushAccentCyan}"
+                                             VerticalContentAlignment="Center"
+                                             ToolTip="Type a city, country, or code (e.g. NYC, BOG, LHR)"
+                                             AutomationProperties.Name="CityQuickSearch"
+                                             TextChanged="CitySearchBox_TextChanged"
+                                             GotFocus="CitySearchBox_GotFocus"
+                                             KeyDown="CitySearchBox_KeyDown"/>
+                                    <TextBlock x:Name="CitySearchPlaceholder"
+                                               Text="Type a city, country or code…"
+                                               IsHitTestVisible="False"
+                                               VerticalAlignment="Center"
+                                               Opacity="0.4" FontSize="12"
+                                               Foreground="{DynamicResource BrushTextPrimary}"/>
+                                    <Popup x:Name="CitySearchPopup"
+                                           PlacementTarget="{x:Reference CitySearchBox}"
+                                           Placement="Bottom"
+                                           AllowsTransparency="True"
+                                           StaysOpen="True">
+                                        <Border Background="{DynamicResource BrushBackgroundMid}"
+                                                BorderBrush="{DynamicResource BrushSeparator}"
+                                                BorderThickness="1" CornerRadius="0,0,6,6"
+                                                MinWidth="280">
+                                            <Border.Effect>
+                                                <DropShadowEffect Color="#000000" BlurRadius="12"
+                                                                  ShadowDepth="4" Opacity="0.8"/>
+                                            </Border.Effect>
+                                            <ListBox x:Name="CitySearchList"
+                                                     MaxHeight="200"
+                                                     Background="Transparent" BorderThickness="0"
+                                                     SelectionChanged="CitySearchList_SelectionChanged">
+                                                <ListBox.ItemContainerStyle>
+                                                    <Style TargetType="ListBoxItem">
+                                                        <Setter Property="Padding"    Value="10,6"/>
+                                                        <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+                                                        <Setter Property="Background" Value="Transparent"/>
+                                                        <Setter Property="Template">
+                                                            <Setter.Value>
+                                                                <ControlTemplate TargetType="ListBoxItem">
+                                                                    <Border x:Name="Bd"
+                                                                            Background="{TemplateBinding Background}"
+                                                                            Padding="{TemplateBinding Padding}">
+                                                                        <ContentPresenter/>
+                                                                    </Border>
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF"/>
+                                                                        </Trigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Style>
+                                                </ListBox.ItemContainerStyle>
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <!-- City info (click fills form) -->
+                                                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding CountryFlag}" FontSize="14"
+                                                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                                <TextBlock Text="{Binding City}" FontSize="12"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{DynamicResource BrushTextPrimary}"
+                                                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                                <TextBlock Text="{Binding Country}" FontSize="10"
+                                                                           Foreground="{DynamicResource BrushTextDim}"
+                                                                           VerticalAlignment="Center"/>
+                                                            </StackPanel>
+                                                            <!-- Quick-add button (adds directly to clocks) -->
+                                                            <Button Grid.Column="1"
+                                                                    Content="+" FontSize="14" FontWeight="Bold"
+                                                                    Width="24" Height="24"
+                                                                    Margin="8,0,2,0"
+                                                                    Background="Transparent"
+                                                                    Foreground="{DynamicResource BrushAccentCyan}"
+                                                                    BorderThickness="0" Cursor="Hand"
+                                                                    ToolTip="Add directly to clocks"
+                                                                    Tag="{Binding}"
+                                                                    Click="AddCityFromSearch_Click">
+                                                                <Button.Template>
+                                                                    <ControlTemplate TargetType="Button">
+                                                                        <Border x:Name="Bd" Background="Transparent"
+                                                                                CornerRadius="4" Padding="2">
+                                                                            <ContentPresenter HorizontalAlignment="Center"
+                                                                                              VerticalAlignment="Center"/>
+                                                                        </Border>
+                                                                        <ControlTemplate.Triggers>
+                                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                                <Setter TargetName="Bd" Property="Background" Value="#3300E5FF"/>
+                                                                            </Trigger>
+                                                                        </ControlTemplate.Triggers>
+                                                                    </ControlTemplate>
+                                                                </Button.Template>
+                                                            </Button>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                        </Border>
+                                    </Popup>
+                                </Grid>
+                            </Border>
+                            <TextBlock Text="— or choose from the cascade below —"
+                                       FontSize="9" FontFamily="Consolas"
+                                       Foreground="{DynamicResource BrushTextDim}"
+                                       HorizontalAlignment="Center" Margin="0,2,0,10"/>
+
+                            <!-- Row 1: Country selector -->
+                            <TextBlock Text="COUNTRY" FontSize="9" FontFamily="Consolas"
+                                       Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="0,0,0,4"/>
+                            <ComboBox x:Name="CountryComboBox"
+                                      Height="36" FontSize="13" Margin="0,0,0,10"
+                                      Background="{DynamicResource BrushBackgroundMid}"
+                                      Foreground="{DynamicResource BrushTextPrimary}"
+                                      BorderBrush="{DynamicResource BrushSeparator}"
+                                      AutomationProperties.Name="CountrySelector"
+                                      SelectionChanged="CountryComboBox_SelectionChanged"
+                                      ToolTip="Select a country"/>
+
+                            <!-- Row 2: City selector -->
+                            <TextBlock Text="CITY" FontSize="9" FontFamily="Consolas"
+                                       Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="0,0,0,4"/>
+                            <ComboBox x:Name="CityComboBox"
+                                      Height="36" FontSize="13" Margin="0,0,0,10"
+                                      Background="{DynamicResource BrushBackgroundMid}"
+                                      Foreground="{DynamicResource BrushTextPrimary}"
+                                      BorderBrush="{DynamicResource BrushSeparator}"
+                                      AutomationProperties.Name="CitySelector"
+                                      IsEnabled="False"
+                                      SelectionChanged="CityComboBox_SelectionChanged"
+                                      ToolTip="Select a city"/>
+
+                            <!-- Row 3: Timezone (read-only, auto-filled) -->
+                            <TextBlock Text="TIMEZONE" FontSize="9" FontFamily="Consolas"
+                                       Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="0,0,0,4"/>
+                            <TextBox x:Name="TimezoneBox"
+                                     Style="{StaticResource InputBox}"
+                                     IsReadOnly="True"
+                                     Margin="0,0,0,10"
+                                     FontSize="11"
+                                     AutomationProperties.Name="TimezoneSelector"
+                                     ToolTip="Timezone is auto-filled when you select a city"/>
+
+                            <!-- Row 4: Display name (pre-filled, editable) -->
+                            <TextBlock Text="DISPLAY NAME" FontSize="9" FontFamily="Consolas"
+                                       Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="0,0,0,4"/>
+                            <Grid Margin="0,0,0,10">
+                                <TextBox x:Name="CityNameBox"
+                                         Style="{StaticResource InputBox}"
+                                         AutomationProperties.Name="CityName"
+                                         ToolTip="Display name for the city clock (auto-filled, can be customised)"/>
+                                <TextBlock x:Name="CityNamePlaceholder"
+                                           Text="Select a city above…"
+                                           IsHitTestVisible="False"
+                                           VerticalAlignment="Center"
+                                           Margin="10,0,0,0"
+                                           Opacity="0.35" FontSize="12"
+                                           Foreground="{DynamicResource BrushTextPrimary}"/>
+                            </Grid>
+
+                            <!-- Row 5: Team label (optional) -->
+                            <TextBlock Text="TEAM LABEL (optional)" FontSize="9" FontFamily="Consolas"
+                                       Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="0,0,0,4"/>
+                            <Grid Margin="0,0,0,12">
+                                <TextBox x:Name="TeamLabelBox"
+                                         Style="{StaticResource InputBox}"
+                                         AutomationProperties.Name="TeamLabel"
+                                         ToolTip="Team label (optional)"/>
+                                <TextBlock x:Name="TeamLabelPlaceholder"
+                                           Text="e.g. Backend Team"
+                                           IsHitTestVisible="False"
+                                           VerticalAlignment="Center"
+                                           Margin="10,0,0,0"
+                                           Opacity="0.35" FontSize="12"
+                                           Foreground="{DynamicResource BrushTextPrimary}"/>
+                            </Grid>
+
+                            <Button x:Name="AddCityButton"
+                                    Content="+ Add City"
+                                    Style="{StaticResource PrimaryBtn}"
+                                    HorizontalAlignment="Left"
+                                    Foreground="{DynamicResource BrushBackgroundDark}"
+                                    Click="AddCityButton_Click"
+                                    AutomationProperties.Name="AddCityButton"/>
+
+                            <TextBlock x:Name="AddCityError"
+                                       Foreground="#EF5350"
+                                       FontSize="11"
+                                       Margin="0,8,0,0"
+                                       TextWrapping="Wrap"
+                                       Visibility="Collapsed"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- REMOVE CITY -->
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}" Text="🗑  REMOVE CITY"/>
+                            <TextBlock FontSize="11" Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="0,0,0,10" TextWrapping="Wrap">
+                                Toggle delete mode to show ✕ buttons on each city card.
+                            </TextBlock>
+                            <ToggleButton x:Name="DeleteModeToggle"
+                                          Content="Delete Mode: OFF"
+                                          Padding="16,7" FontSize="13"
+                                          HorizontalAlignment="Left"
+                                          AutomationProperties.Name="DeleteModeToggle"
+                                          Checked="DeleteModeToggle_Checked"
+                                          Unchecked="DeleteModeToggle_Unchecked">
+                                <ToggleButton.Style>
+                                    <Style TargetType="ToggleButton">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ToggleButton">
+                                                    <Border x:Name="Bd"
+                                                            Background="{DynamicResource BrushBackgroundMid}"
+                                                            BorderBrush="{DynamicResource BrushSeparator}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="6"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background" Value="#C62828"/>
+                                                            <Setter TargetName="Bd" Property="BorderBrush"  Value="#C62828"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+                                        <Setter Property="Cursor"     Value="Hand"/>
+                                    </Style>
+                                </ToggleButton.Style>
+                            </ToggleButton>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- EDIT MODE -->
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}" Text="✏  EDIT MODE"/>
+                            <TextBlock FontSize="11" Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="0,0,0,10" TextWrapping="Wrap">
+                                Toggle edit mode to show a ✏ button on each city card.
+                                Click it to edit the city name, flag emoji, and team label inline.
+                            </TextBlock>
+                            <ToggleButton x:Name="EditModeToggle"
+                                          Content="Edit Mode: OFF"
+                                          Padding="16,7" FontSize="13"
+                                          HorizontalAlignment="Left"
+                                          AutomationProperties.Name="EditModeToggle"
+                                          Checked="EditModeToggle_Checked"
+                                          Unchecked="EditModeToggle_Unchecked">
+                                <ToggleButton.Style>
+                                    <Style TargetType="ToggleButton">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ToggleButton">
+                                                    <Border x:Name="Bd"
+                                                            Background="{DynamicResource BrushBackgroundMid}"
+                                                            BorderBrush="{DynamicResource BrushSeparator}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="6"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background" Value="#1565C0"/>
+                                                            <Setter TargetName="Bd" Property="BorderBrush"  Value="#1565C0"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+                                        <Setter Property="Cursor"     Value="Hand"/>
+                                    </Style>
+                                </ToggleButton.Style>
+                            </ToggleButton>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- SCALE MODE -->
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}" Text="↔  SCALE MODE"/>
+                            <RadioButton x:Name="ProportionScaleRadio"
+                                         Content="Proportion Scale (default)"
+                                         GroupName="ScaleMode"
+                                         Foreground="{DynamicResource BrushTextPrimary}"
+                                         Margin="0,0,0,4"
+                                         Checked="ScaleMode_Changed"/>
+                            <TextBlock Text="All elements shrink/grow proportionally. The full UI stays visible at any window size."
+                                       FontSize="10" Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="20,0,0,8" TextWrapping="Wrap"/>
+                            <RadioButton x:Name="MinLimitRadio"
+                                         Content="MinLimit Scale"
+                                         GroupName="ScaleMode"
+                                         Foreground="{DynamicResource BrushTextPrimary}"
+                                         Margin="0,4,0,4"
+                                         Checked="ScaleMode_Changed"/>
+                            <TextBlock Text="Elements keep their minimum designed size. Scrollbars appear when the window is smaller."
+                                       FontSize="10" Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="20,0,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>
