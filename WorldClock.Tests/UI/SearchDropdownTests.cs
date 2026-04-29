@@ -68,6 +68,7 @@ public sealed class SearchDropdownTests : IDisposable
     public void Search_TextBox_IsPresentAndEnabled()
     {
         SkipIfNoApp();
+        EnsureTranslatorOpen();
         var searchBox = FindSearchBox();
         searchBox.Should().NotBeNull("the add-city search TextBox must be in the UI tree");
         searchBox!.IsEnabled.Should().BeTrue("the search box must be interactable");
@@ -80,6 +81,7 @@ public sealed class SearchDropdownTests : IDisposable
     public void Search_TypingCityName_ShowsDropdownAfterIdleDelay()
     {
         SkipIfNoApp();
+        EnsureTranslatorOpen();
         var window    = GetWindow();
         var searchBox = FindSearchBox();
         searchBox!.Click();
@@ -109,6 +111,7 @@ public sealed class SearchDropdownTests : IDisposable
     public void Search_TypingCityName_DropdownContainsMatchingRows()
     {
         SkipIfNoApp();
+        EnsureTranslatorOpen();
         var window    = GetWindow();
         var searchBox = FindSearchBox();
         searchBox!.Click();
@@ -130,6 +133,7 @@ public sealed class SearchDropdownTests : IDisposable
     public void Search_PressEnter_ShowsDropdownWithoutWaitingForTimer()
     {
         SkipIfNoApp();
+        EnsureTranslatorOpen();
         var window    = GetWindow();
         var searchBox = FindSearchBox();
         searchBox!.Click();
@@ -153,6 +157,7 @@ public sealed class SearchDropdownTests : IDisposable
     public void Search_PressEscape_HidesDropdown()
     {
         SkipIfNoApp();
+        EnsureTranslatorOpen();
         var window    = GetWindow();
         var searchBox = FindSearchBox();
         searchBox!.Click();
@@ -181,6 +186,7 @@ public sealed class SearchDropdownTests : IDisposable
     public void Search_SelectingResult_AddsClockCard()
     {
         SkipIfNoApp();
+        EnsureTranslatorOpen();
         var window    = GetWindow();
         var searchBox = FindSearchBox();
         searchBox!.Click();
@@ -216,6 +222,27 @@ public sealed class SearchDropdownTests : IDisposable
 
     private Window GetWindow() =>
         _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(5));
+
+    /// <summary>
+    /// Ensures the Time Translator panel is expanded so that the search bar
+    /// (which lives inside the collapsible section) is accessible.
+    /// Clicks the toggle button when the search box is not yet on-screen.
+    /// </summary>
+    private void EnsureTranslatorOpen()
+    {
+        var window    = GetWindow();
+        var searchBox = window.FindFirstDescendant(x =>
+            x.ByControlType(ControlType.Edit).And(x.ByName("AddCitySearch")));
+
+        if (searchBox != null && !searchBox.IsOffscreen) return;
+
+        var toggle = window.FindFirstDescendant(x =>
+            x.ByControlType(ControlType.Button)
+             .And(x.ByName("ToggleTranslatorButton")));
+
+        toggle?.Click();
+        Thread.Sleep(400); // allow expand animation / layout
+    }
 
     /// <summary>Finds the GlobalCitySearchBox by its AutomationProperties.Name.</summary>
     private AutomationElement? FindSearchBox()

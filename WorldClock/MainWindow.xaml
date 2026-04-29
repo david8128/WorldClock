@@ -142,10 +142,9 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>  <!-- 0: header -->
                 <RowDefinition Height="Auto"/>  <!-- 1: UTC banner -->
-                <RowDefinition Height="Auto"/>  <!-- 2: time translator -->
-                <RowDefinition Height="Auto"/>  <!-- 3: add-city search bar -->
-                <RowDefinition Height="*"/>     <!-- 4: location cards -->
-                <RowDefinition Height="Auto"/>  <!-- 5: footer -->
+                <RowDefinition Height="Auto"/>  <!-- 2: time translator (contains add-city search) -->
+                <RowDefinition Height="*"/>     <!-- 3: location cards -->
+                <RowDefinition Height="Auto"/>  <!-- 4: footer -->
             </Grid.RowDefinitions>
 
             <!-- HEADER / TITLE BAR -->
@@ -804,43 +803,46 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </ScrollViewer>
+
+                        <!-- ADD-CITY SEARCH — inside the Time Translator expanded panel.
+                             Selecting a result calls AddLocation which adds a new row to
+                             both the timeline grid and the location cards below. -->
+                        <Border x:Name="GlobalCitySearchBar" Margin="8,6,8,8" CornerRadius="8"
+                                Background="{DynamicResource BrushBackgroundCard}">
+                            <Grid Margin="12,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="+" FontSize="18" FontWeight="Bold"
+                                           VerticalAlignment="Center" Margin="0,0,10,0"
+                                           Foreground="{DynamicResource BrushAccentCyan}" Opacity="0.8"/>
+                                <Grid Grid.Column="1">
+                                    <TextBox x:Name="GlobalCitySearchBox"
+                                             Background="Transparent" BorderThickness="0"
+                                             Foreground="{DynamicResource BrushTextPrimary}"
+                                             FontSize="12" CaretBrush="{DynamicResource BrushAccentCyan}"
+                                             VerticalContentAlignment="Center"
+                                             ToolTip="Type a city or country to add it to the timeline"
+                                             AutomationProperties.Name="AddCitySearch"
+                                             GotFocus="GlobalCitySearch_GotFocus"
+                                             TextChanged="GlobalCitySearch_TextChanged"
+                                             KeyDown="GlobalCitySearch_KeyDown"
+                                             LostFocus="GlobalCitySearch_LostFocus"/>
+                                    <TextBlock x:Name="GlobalCitySearchPlaceholder"
+                                               Text="Add a city to the timeline…"
+                                               IsHitTestVisible="False" VerticalAlignment="Center"
+                                               Opacity="0.4" FontSize="12"
+                                               Foreground="{DynamicResource BrushTextPrimary}"/>
+                                </Grid>
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </StackPanel>
             </Border>
 
-            <!-- ADD-CITY GLOBAL SEARCH BAR -->
-            <Border x:Name="GlobalCitySearchBar" Grid.Row="3" Margin="16,10,16,0" CornerRadius="10"
-                    Background="{DynamicResource BrushBackgroundMid}">
-                <Grid Margin="14,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="🔍" FontSize="16"
-                               VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.5"/>
-                    <Grid Grid.Column="1">
-                        <TextBox x:Name="GlobalCitySearchBox"
-                                 Background="Transparent" BorderThickness="0"
-                                 Foreground="{DynamicResource BrushTextPrimary}"
-                                 FontSize="13" CaretBrush="{DynamicResource BrushAccentCyan}"
-                                 VerticalContentAlignment="Center"
-                                 ToolTip="Type a city, country or timezone to add it to your list"
-                                 AutomationProperties.Name="AddCitySearch"
-                                 GotFocus="GlobalCitySearch_GotFocus"
-                                 TextChanged="GlobalCitySearch_TextChanged"
-                                 KeyDown="GlobalCitySearch_KeyDown"
-                                 LostFocus="GlobalCitySearch_LostFocus"/>
-                        <TextBlock x:Name="GlobalCitySearchPlaceholder"
-                                   Text="Add a city, country or timezone…"
-                                   IsHitTestVisible="False" VerticalAlignment="Center"
-                                   Opacity="0.4" FontSize="13"
-                                   Foreground="{DynamicResource BrushTextPrimary}"/>
-                    </Grid>
-                </Grid>
-            </Border>
-
             <!-- LOCATION CARDS -->
-            <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto" Margin="8,6,8,0">
+            <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Margin="8,6,8,0">
                 <ItemsControl x:Name="LocationsPanel" ItemsSource="{Binding Locations}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -1111,7 +1113,7 @@
                  Canvas spans all rows at ZIndex 100 inside the same visual tree.
                  This avoids the AllowsTransparency + Popup HWND Z-order bug where
                  the layered window surface renders on top of the Popup's separate HWND. -->
-            <Canvas x:Name="SearchOverlayCanvas" Grid.Row="0" Grid.RowSpan="6"
+            <Canvas x:Name="SearchOverlayCanvas" Grid.Row="0" Grid.RowSpan="5"
                     Panel.ZIndex="100" IsHitTestVisible="False">
                 <Border x:Name="GlobalSearchDropdown"
                         Visibility="Collapsed"
@@ -1177,7 +1179,7 @@
                 </Border>
             </Canvas>
 
-            <Border Grid.Row="5" Background="{DynamicResource BrushBackgroundMid}" Padding="16,8">
+            <Border Grid.Row="4" Background="{DynamicResource BrushBackgroundMid}" Padding="16,8">
                 <TextBlock Text="© 2026 World Clock  •  All times update every second  •  Built with .NET 8 WPF"
                            FontSize="10" Foreground="{DynamicResource BrushTextDim}"
                            HorizontalAlignment="Center"/>
