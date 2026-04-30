@@ -121,6 +121,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             foreach (var l in Locations) l.Refresh();
             RefreshHomeDiffs();
+            Translator.RefreshCurrentTime();
         };
         _timer.Start();
     }

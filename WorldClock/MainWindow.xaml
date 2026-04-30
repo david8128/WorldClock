@@ -1143,6 +1143,24 @@
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
+                                            <!-- Layer 3: current-time needle spanning the header strip (today only) -->
+                                            <Canvas IsHitTestVisible="False" HorizontalAlignment="Left" Height="22">
+                                                <Rectangle
+                                                    Canvas.Left="{Binding Translator.CurrentTimeLeft}"
+                                                    Canvas.Top="0" Width="2" Height="22">
+                                                    <Rectangle.Style>
+                                                        <Style TargetType="Rectangle">
+                                                            <Setter Property="Fill" Value="#D9FFFFFF"/>
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Translator.ShowCurrentTime}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Rectangle.Style>
+                                                </Rectangle>
+                                            </Canvas>
                                         </Grid>
                                     </Border>
 
@@ -1407,6 +1425,24 @@
                                                                 </DataTemplate>
                                                             </ItemsControl.ItemTemplate>
                                                         </ItemsControl>
+                                                        <!-- Layer 3: current-time needle (today only) -->
+                                                        <Canvas IsHitTestVisible="False" HorizontalAlignment="Left" Height="34">
+                                                            <Rectangle
+                                                                Canvas.Left="{Binding CurrentTimeLeft}"
+                                                                Canvas.Top="0" Width="2" Height="34">
+                                                                <Rectangle.Style>
+                                                                    <Style TargetType="Rectangle">
+                                                                        <Setter Property="Fill" Value="#D9FFFFFF"/>
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding ShowCurrentTime}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Rectangle.Style>
+                                                            </Rectangle>
+                                                        </Canvas>
                                                     </Grid>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>

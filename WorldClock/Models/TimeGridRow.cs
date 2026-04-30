@@ -81,6 +81,27 @@ public sealed class TimeGridRow : INotifyPropertyChanged
         set { if (_showTranslatedTime == value) return; _showTranslatedTime = value; OnPropertyChanged(); }
     }
 
+    // ── Current-time needle ───────────────────────────────────────────────────
+    private double _currentTimeLeft = -1;
+
+    /// <summary>Pixel offset from the row's left edge to the current-time needle.
+    /// Negative when the viewed date is not today (needle hidden).
+    /// 160 px row-header + slot * 14 px + fractional offset within the slot.</summary>
+    public double CurrentTimeLeft
+    {
+        get => _currentTimeLeft;
+        set
+        {
+            if (Math.Abs(_currentTimeLeft - value) < 0.01) return;
+            _currentTimeLeft = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ShowCurrentTime));
+        }
+    }
+
+    /// <summary>True when the current-time needle should be visible (today only).</summary>
+    public bool ShowCurrentTime => _currentTimeLeft >= 0;
+
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

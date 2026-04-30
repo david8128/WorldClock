@@ -31,8 +31,9 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
     private TimeZoneInfo? _homeZone;          // home location's timezone (null = not set)
     private bool         _isOpen = true;   // expanded by default
     private bool         _hasExplicitSelection;
-    private int _selectionStart = DateTime.Now.Hour * 2;
-    private int _selectionEnd   = DateTime.Now.Hour * 2;
+    private int    _selectionStart    = DateTime.Now.Hour * 2;
+    private int    _selectionEnd      = DateTime.Now.Hour * 2;
+    private double _currentTimeLeft   = -1.0;
 
     public DateTime? Date
     {
@@ -74,6 +75,25 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         get => _isOpen;
         set => SetProperty(ref _isOpen, value);
     }
+
+    // ── Current-time needle (today-only vertical marker) ─────────────────────
+
+    /// <summary>Pixel offset from the left edge of the visualizer to the current-time needle.
+    /// Includes the 160 px row-header.  Negative when the viewed date is not today.</summary>
+    public double CurrentTimeLeft
+    {
+        get => _currentTimeLeft;
+        private set
+        {
+            if (Math.Abs(_currentTimeLeft - value) < 0.01) return;
+            _currentTimeLeft = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ShowCurrentTime));
+        }
+    }
+
+    /// <summary>True when the current-time needle should be visible in the header.</summary>
+    public bool ShowCurrentTime => _currentTimeLeft >= 0;
 
     // ── Selection window (half-hour slot indices 0-47) ───────────────────────
     // Legacy int getter: hour of the selection start (for test compat)
@@ -390,6 +410,9 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
             row.DateDayDiff = sdiff;
             Rows.Add(row);
         }
+
+        // Stamp the current-time needle position on every row
+        RefreshCurrentTime();
     }
 
     // ── Point-in-time translation (populates Results) ─────────────────────────
@@ -502,6 +525,35 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         >= 18 and <= 21 => TimeBand.Evening,
         _               => TimeBand.Night,
     };
+
+    // ── Current-time needle helpers ────────────────────────────────────────
+
+    /// <summary>
+    /// Computes the pixel offset from the visualizer's left edge to "now" in the
+    /// reference timezone (home tz, or source tz if no home is set).
+    /// Returns -1 when the viewed date is not today.
+    /// Row header = 160 px, each 30-min slot = 14 px.
+    /// </summary>
+    private double ComputeCurrentTimeLeft()
+    {
+        if ((_date ?? DateTime.Today).Date != DateTime.Today) return -1.0;
+        var refZone  = _homeZone ?? _sourceZone;
+        var now      = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, refZone);
+        double slots = now.Hour * 2.0 + now.Minute / 30.0;  // fractional slot index
+        return 160.0 + slots * 14.0;                         // 160 = row-header width px
+    }
+
+    /// <summary>
+    /// Updates the needle position on the view-model and on every row.
+    /// Called by the main 1-second timer tick and at the end of BuildGrid().
+    /// </summary>
+    public void RefreshCurrentTime()
+    {
+        double left = ComputeCurrentTimeLeft();
+        CurrentTimeLeft = left;
+        foreach (var row in Rows)
+            row.CurrentTimeLeft = left;
+    }
 
     private static string ToAmPmHour(int hour24)
     {
