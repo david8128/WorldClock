@@ -12,8 +12,16 @@ public sealed record CityEntry(
     /// <summary>
     /// Short codes for this city (IATA airport codes, UN/LOCODE, common abbreviations).
     /// Used for fast acronym search: typing "NYC", "BOG", "LAX" returns the matching city.
+    /// Codes[0] is always the City_IATA from the CSV (the primary city-level code).
     /// </summary>
-    string[]? Codes = null);
+    string[]? Codes = null)
+{
+    /// <summary>
+    /// All codes joined with " | ", or empty string if none.
+    /// Bindable in XAML to show all IATA/airport codes for this city in search results.
+    /// </summary>
+    public string PrimaryCode => Codes is { Length: > 0 } ? string.Join(" | ", Codes) : string.Empty;
+}
 
 /// <summary>
 /// Catalogue of world cities with their country, flag, and Windows timezone ID.

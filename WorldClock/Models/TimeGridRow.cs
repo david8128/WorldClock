@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
+using WorldClock.Helpers;
 
 namespace WorldClock.Models;
 
@@ -12,8 +13,13 @@ public sealed class TimeGridRow : INotifyPropertyChanged
     // ── Location identity (shown in the frozen row header) ───────────────────
     public required string          CityName    { get; init; }
     public required string          CountryFlag { get; init; }
+    /// <summary>Country name for the second line of the row header card.</summary>
+    public required string          Country     { get; init; }
     public required string          UtcOffset   { get; init; }
     public required SolidColorBrush AccentBrush { get; init; }
+    /// <summary>Theme-aware accent brush: darkened on light themes for WCAG AA contrast,
+    /// vivid on dark themes. Computed live — rows are recreated on theme switch.</summary>
+    public SolidColorBrush ThemedAccentBrush => ThemeColorHelper.ThemedBrush(AccentBrush);
     /// <summary>True when this row represents the current source timezone.</summary>
     public required bool            IsSource    { get; init; }
 
@@ -34,6 +40,45 @@ public sealed class TimeGridRow : INotifyPropertyChanged
     {
         get => _dateDayDiff;
         set { if (_dateDayDiff == value) return; _dateDayDiff = value; OnPropertyChanged(); }
+    }
+
+    // ── Translated time for the selected slot (populated by Translate()) ─────
+    private string? _selectedTimeStr;
+    public string? SelectedTimeStr
+    {
+        get => _selectedTimeStr;
+        set { if (_selectedTimeStr == value) return; _selectedTimeStr = value; OnPropertyChanged(); }
+    }
+
+    private string? _selectedEndTimeStr;
+    public string? SelectedEndTimeStr
+    {
+        get => _selectedEndTimeStr;
+        set { if (_selectedEndTimeStr == value) return; _selectedEndTimeStr = value; OnPropertyChanged(); }
+    }
+
+    private bool _hasRange;
+    public bool HasRange
+    {
+        get => _hasRange;
+        set { if (_hasRange == value) return; _hasRange = value; OnPropertyChanged(); }
+    }
+
+    private bool _isDst;
+    public bool IsDst
+    {
+        get => _isDst;
+        set { if (_isDst == value) return; _isDst = value; OnPropertyChanged(); OnPropertyChanged(nameof(DstLabel)); }
+    }
+
+    public string DstLabel => _isDst ? "☀ DST" : "— STD";
+
+    /// <summary>True after the user has explicitly clicked/dragged a slot; controls time visibility in the row card.</summary>
+    private bool _showTranslatedTime;
+    public bool ShowTranslatedTime
+    {
+        get => _showTranslatedTime;
+        set { if (_showTranslatedTime == value) return; _showTranslatedTime = value; OnPropertyChanged(); }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

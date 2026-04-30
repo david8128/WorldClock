@@ -18,10 +18,20 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _headerTimer;
     private readonly DispatcherTimer _globalSearchTimer = new();
 
-    private const int RowHeaderWidth = 90;
-    private const int SlotCellWidth   = 20;
+    private const int RowHeaderWidth = 160;
+    private const int SlotCellWidth   = 14;
     private bool _isDragging;
     private int  _dragStartSlot;
+
+    // ── Auto-resize constants ─────────────────────────────────────────────────
+    // DesignRoot is 1100×760. The Viewbox scales it uniformly to fill the window.
+    // We grow DesignRoot.Height beyond the 760 baseline when clock count exceeds
+    // the threshold that comfortably fits within the baseline height, then resize
+    // the window proportionally so the scale factor stays the same.
+    private const double DesignWidth         = 1100.0;  // fixed — never changes
+    private const double BaseDesignHeight    =  760.0;  // baseline for ≤ threshold clocks
+    private const double ClockCardDesignH    =   72.0;  // one clock card in design units
+    private const int    ClockCountThreshold =    8;    // clocks that fit in the baseline
 
     // ── Card drag-and-drop state ──────────────────────────────────────────────
     private ClockLocation? _draggedItem;
@@ -58,12 +68,49 @@ public partial class MainWindow : Window
 
         // Once the window handle exists, apply acrylic and subscribe to changes
         Loaded += OnLoaded;
+
+        // Auto-resize the window whenever the clock list changes
+        _vm.Locations.CollectionChanged += (_, _) => UpdateWindowSizeForClocks();
+    }
+
+    // ── Auto window sizing ────────────────────────────────────────────────────
+    /// <summary>
+    /// Grows (never shrinks) DesignRoot.Height and Window.Height when the
+    /// number of user clocks exceeds <see cref="ClockCountThreshold"/>.
+    /// The Viewbox (Stretch=Uniform) scales the design canvas proportionally to
+    /// the window, so growing both by the same ratio keeps text at the same
+    /// apparent size while giving all cards natural (uncompressed) height.
+    /// </summary>
+    private void UpdateWindowSizeForClocks()
+    {
+        // Count user clocks — exclude the always-present UTC sentinel (index 0)
+        int userClocks = Math.Max(0, _vm.Locations.Count - 1);
+
+        double extraCards   = Math.Max(0, userClocks - ClockCountThreshold);
+        double newDesignH   = BaseDesignHeight + extraCards * ClockCardDesignH;
+
+        // Only grow — never shrink back (avoids jarring resize when deleting one clock)
+        if (newDesignH <= DesignRoot.Height) return;
+
+        DesignRoot.Height = newDesignH;
+
+        // Grow the window proportionally so the scale factor stays the same.
+        // scale = ActualWidth / DesignWidth  →  newWindowH = newDesignH * scale
+        if (ActualWidth <= 0) return;
+        double scale       = ActualWidth / DesignWidth;
+        double newWindowH  = newDesignH * scale;
+
+        MinHeight = newWindowH;
+        if (Height < newWindowH)
+            Height = newWindowH;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         ApplyAcrylic();
         ApplyScaleMode();
+        ApplyVisualizerLayout();
+        UpdateWindowSizeForClocks();
 
         ThemeService.Instance.PropertyChanged += (_, args) =>
         {
@@ -73,20 +120,41 @@ public partial class MainWindow : Window
 
             if (args.PropertyName == nameof(ThemeService.ScaleMode))
                 ApplyScaleMode();
+
+            if (args.PropertyName is nameof(ThemeService.EditMode)
+                                  or nameof(ThemeService.DeleteMode))
+                UpdateModeButtonStates();
         };
+        UpdateModeButtonStates();
     }
 
     // ── Scale mode ────────────────────────────────────────────────────────────
-    // Layout is now always fluid (DesignRoot binds its Width to the ScrollViewer).
-    // ScaleMode setting is kept for settings persistence but no longer controls a Viewbox.
+    // ProportionScale (default): Viewbox.Stretch=Uniform scales the fixed 1100×760 design
+    //   to fill the window at any size — no scrollbars needed.
+    // MinLimit: same Uniform scale but DesignRoot has minimum pixel dimensions;
+    //   scrollbars appear only when the window is shrunk below those minimums.
 
     private void ApplyScaleMode()
     {
-        // Both modes now get a fluid layout — scrollbars appear only when the window
-        // is narrower than MinWidth (430px).
-        ScaleViewbox.Stretch = Stretch.None;
-        ScaleScrollViewer.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
-        ScaleScrollViewer.VerticalScrollBarVisibility   = ScrollBarVisibility.Auto;
+        var mode = ThemeService.Instance.ScaleMode;
+
+        if (mode == ScaleMode.MinLimit)
+        {
+            // Scale proportionally but stop at half the design size; scrollbars below that.
+            ScaleViewbox.Stretch = Stretch.Uniform;
+            DesignRoot.MinWidth  = 550;   // half of 1100
+            DesignRoot.MinHeight = 380;   // half of 760
+            ScaleScrollViewer.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+            ScaleScrollViewer.VerticalScrollBarVisibility   = ScrollBarVisibility.Auto;
+        }
+        else // ProportionScale — always fits, no scrollbars
+        {
+            ScaleViewbox.Stretch = Stretch.Uniform;
+            DesignRoot.MinWidth  = 0;
+            DesignRoot.MinHeight = 0;
+            ScaleScrollViewer.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+            ScaleScrollViewer.VerticalScrollBarVisibility   = ScrollBarVisibility.Disabled;
+        }
     }
 
     // ── Acrylic ───────────────────────────────────────────────────────────────
@@ -233,9 +301,128 @@ public partial class MainWindow : Window
     private void ToggleTranslator_Click(object sender, RoutedEventArgs e)
     {
         _vm.Translator.IsOpen = !_vm.Translator.IsOpen;
+        ApplyVisualizerLayout(animated: true);
         if (_vm.Translator.IsOpen)
             Dispatcher.InvokeAsync(SelectCurrentSlot,
                                    System.Windows.Threading.DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// Expands/collapses the clocks panel. When <paramref name="animated"/> is true a
+    /// smooth 300 ms ease-out-cubic animation expands/contracts the column. After a
+    /// collapse animation the card list fades in as a WrapPanel grid; expanding always
+    /// switches back to a StackPanel immediately so cards stack vertically during the
+    /// shrink-back animation.
+    /// </summary>
+    private DispatcherTimer? _layoutAnimTimer;
+
+    private void ApplyVisualizerLayout(bool animated = false)
+    {
+        _layoutAnimTimer?.Stop();
+
+        if (_vm.Translator.IsOpen)
+        {
+            // ── Visualizer OPEN: switch to stack immediately, then animate to 220 px ──
+            SwitchToStackLayout();
+            VisualizerPanelBorder.Visibility = Visibility.Visible;
+            VisualizerColumnDef.Width        = new GridLength(1, GridUnitType.Star);
+            ClocksPanelBorder.CornerRadius   = new CornerRadius(10, 0, 0, 10);
+            ClocksPanelHeader.CornerRadius   = new CornerRadius(10, 0, 0, 0);
+
+            if (animated)
+                AnimateLayout(ClocksColumnDef.ActualWidth, 220, finalColStar: true);
+            else
+                ClocksColumnDef.Width = new GridLength(220);
+        }
+        else
+        {
+            // ── Visualizer CLOSED: full-width clocks, grid layout after animation ──
+            VisualizerPanelBorder.Visibility = Visibility.Collapsed;
+            VisualizerColumnDef.Width        = new GridLength(0);
+            ClocksPanelBorder.CornerRadius   = new CornerRadius(10);
+            ClocksPanelHeader.CornerRadius   = new CornerRadius(10, 10, 0, 0);
+
+            if (animated)
+                AnimateLayout(220, ActualWidth - 32, finalColStar: false);
+            else
+            {
+                ClocksColumnDef.Width = new GridLength(1, GridUnitType.Star);
+                SwitchToGridLayout();
+            }
+        }
+    }
+
+    private void AnimateLayout(double fromColPx, double toColPx, bool finalColStar)
+    {
+        const double DurationMs = 300;
+        double elapsed = 0;
+
+        ClocksColumnDef.Width = new GridLength(fromColPx, GridUnitType.Pixel);
+
+        _layoutAnimTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(14) };
+        _layoutAnimTimer.Tick += (_, _) =>
+        {
+            elapsed += 14;
+            double t     = Math.Min(elapsed / DurationMs, 1.0);
+            double eased = 1 - Math.Pow(1 - t, 3);   // ease-out cubic
+
+            ClocksColumnDef.Width = new GridLength(
+                fromColPx + (toColPx - fromColPx) * eased, GridUnitType.Pixel);
+
+            if (t >= 1.0)
+            {
+                _layoutAnimTimer!.Stop();
+                _layoutAnimTimer = null;
+                if (finalColStar)
+                    ClocksColumnDef.Width = new GridLength(220);
+                else
+                {
+                    ClocksColumnDef.Width = new GridLength(1, GridUnitType.Star);
+                    SwitchToGridLayoutAnimated();  // fade grid in after column fully expanded
+                }
+            }
+        };
+        _layoutAnimTimer.Start();
+    }
+
+    /// <summary>Switches the card list back to a vertical StackPanel (normal mode).</summary>
+    private void SwitchToStackLayout()
+    {
+        LocationsPanel.Opacity              = 1;
+        LocationsPanel.MaxWidth             = 220;
+        LocationsPanel.HorizontalAlignment  = HorizontalAlignment.Center;
+        var factory = new FrameworkElementFactory(typeof(StackPanel));
+        factory.SetValue(StackPanel.OrientationProperty, Orientation.Vertical);
+        LocationsPanel.ItemsPanel = new ItemsPanelTemplate { VisualTree = factory };
+    }
+
+    /// <summary>Switches the card list to a wrapping grid (focus mode, no animation).</summary>
+    private void SwitchToGridLayout()
+    {
+        LocationsPanel.MaxWidth            = double.PositiveInfinity;
+        LocationsPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
+        var factory = new FrameworkElementFactory(typeof(WrapPanel));
+        factory.SetValue(WrapPanel.ItemWidthProperty, 220.0);
+        LocationsPanel.ItemsPanel = new ItemsPanelTemplate { VisualTree = factory };
+        LocationsPanel.Opacity = 1;
+    }
+
+    /// <summary>Switches to grid layout then fades the panel in over 200 ms.</summary>
+    private void SwitchToGridLayoutAnimated()
+    {
+        LocationsPanel.Opacity = 0;
+        SwitchToGridLayout();
+
+        double elapsed = 0;
+        var fadeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(14) };
+        fadeTimer.Tick += (_, _) =>
+        {
+            elapsed += 14;
+            double t = Math.Min(elapsed / 200.0, 1.0);
+            LocationsPanel.Opacity = t;
+            if (t >= 1.0) fadeTimer.Stop();
+        };
+        fadeTimer.Start();
     }
 
     // ── Time Translator — date navigation ─────────────────────────────────────
@@ -253,7 +440,7 @@ public partial class MainWindow : Window
                                System.Windows.Threading.DispatcherPriority.Background);
     }
 
-    // ── Time Translator — grid drag-select (transposed: click/drag across slots) ──
+    // ── Time Visualizer — grid drag-select (transposed: click/drag across slots) ──
 
     private int GetSlotFromPosition(FrameworkElement container, Point pos)
     {
@@ -303,6 +490,7 @@ public partial class MainWindow : Window
     //   • LostFocus hides the dropdown unless focus moved into it
 
     private CancellationTokenSource _globalSearchCts = new();
+    private int _dropdownHighlight = -1;  // currently highlighted row index (-1 = none)
 
     // Called once from constructor to wire up the idle timer
     private void InitGlobalSearch()
@@ -317,17 +505,6 @@ public partial class MainWindow : Window
     {
         if (!GlobalCitySearchList.HasItems) return;
 
-        // GlobalCitySearchBar and SearchOverlayCanvas are SIBLINGS inside LayoutRoot.
-        // TransformToAncestor requires an actual ancestor — use LayoutRoot as the
-        // common reference. The Canvas starts at LayoutRoot row 0 so its coordinate
-        // origin is the same as LayoutRoot's, making Canvas.Left/Top values correct.
-        var origin = GlobalCitySearchBar
-            .TransformToAncestor(LayoutRoot)
-            .Transform(new Point(0, GlobalCitySearchBar.ActualHeight));
-
-        Canvas.SetLeft(GlobalSearchDropdown, origin.X);
-        Canvas.SetTop(GlobalSearchDropdown,  origin.Y);
-        GlobalSearchDropdown.Width = GlobalCitySearchBar.ActualWidth;
         GlobalSearchDropdown.Visibility = Visibility.Visible;
     }
 
@@ -335,6 +512,41 @@ public partial class MainWindow : Window
     {
         _globalSearchTimer.Stop();
         GlobalSearchDropdown.Visibility = Visibility.Collapsed;
+        SetDropdownHighlight(-1);
+    }
+
+    /// <summary>
+    /// Highlights the item at <paramref name="index"/> by setting the Background local value
+    /// directly on the inner Border (Bd) of each ListBoxItem's visual tree.
+    /// <para>
+    /// Why VisualTreeHelper instead of item.Background:
+    /// The ControlTemplate's Border has Background="{DynamicResource ...}" which reads
+    /// directly from the resource dictionary — it is NOT bound to ListBoxItem.Background.
+    /// Setting item.Background has zero visible effect.  Setting Bd.Background as a local
+    /// value (DP precedence 3) wins over DynamicResource (precedence 9) and template
+    /// triggers (precedence 7), so the cyan highlight is always visible.
+    /// ClearValue() removes the local value so triggers (hover, etc.) resume normally.
+    /// </para>
+    /// </summary>
+    private void SetDropdownHighlight(int index)
+    {
+        _dropdownHighlight = index;
+        var cyanBrush = TryFindResource("BrushAccentCyan") as Brush ?? Brushes.Cyan;
+
+        for (int i = 0; i < GlobalCitySearchList.Items.Count; i++)
+        {
+            if (GlobalCitySearchList.ItemContainerGenerator.ContainerFromIndex(i)
+                    is not ListBoxItem item) continue;
+
+            // The ListBoxItem’s visual tree is: ListBoxItem → Border (Bd) → ContentPresenter
+            if (VisualTreeHelper.GetChildrenCount(item) == 0) continue;
+            if (VisualTreeHelper.GetChild(item, 0) is not Border bd) continue;
+
+            if (i == index)
+                bd.Background = cyanBrush;   // local value (level 3): beats DynamicResource + triggers
+            else
+                bd.ClearValue(Border.BackgroundProperty);  // removes local value → triggers resume
+        }
     }
 
     // ── Timer: fires when the user stops typing ───────────────────────────────
@@ -382,22 +594,56 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Enter:
-                // Immediate search without waiting for the timer
-                _globalSearchTimer.Stop();
-                var text = GlobalCitySearchBox.Text.Trim();
-                if (!string.IsNullOrEmpty(text))
-                    await CommitSearchAsync(text);
                 e.Handled = true;
+                if (GlobalSearchDropdown.Visibility == Visibility.Visible && GlobalCitySearchList.HasItems)
+                {
+                    // Commit highlighted row, or fall back to first item
+                    int idx  = _dropdownHighlight >= 0 ? _dropdownHighlight : 0;
+                    var pick = GlobalCitySearchList.Items[idx] as CityEntry;
+                    if (pick != null) CommitGlobalCity(pick);
+                }
+                else
+                {
+                    _globalSearchTimer.Stop();
+                    var text = GlobalCitySearchBox.Text.Trim();
+                    if (!string.IsNullOrEmpty(text))
+                        await CommitSearchAsync(text);
+                }
                 break;
 
             case Key.Down:
-                // Move focus into the list so arrow keys can navigate it
-                if (GlobalCitySearchList.HasItems)
+                if (GlobalSearchDropdown.Visibility != Visibility.Visible || !GlobalCitySearchList.HasItems)
+                    break;
                 {
-                    GlobalCitySearchList.Focus();
-                    GlobalCitySearchList.SelectedIndex = 0;
-                    (GlobalCitySearchList.ItemContainerGenerator
-                        .ContainerFromIndex(0) as ListBoxItem)?.Focus();
+                    int count = GlobalCitySearchList.Items.Count;
+                    int next  = _dropdownHighlight < count - 1 ? _dropdownHighlight + 1 : 0;
+                    _dropdownHighlight = next;  // advance immediately so rapid presses are correct
+                    GlobalCitySearchList.SelectedIndex = next;
+                    GlobalCitySearchList.ScrollIntoView(GlobalCitySearchList.Items[next]);
+                    // Use BeginInvoke so containers are fully laid out before we paint them
+                    _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, () => SetDropdownHighlight(next));
+                }
+                e.Handled = true;
+                break;
+
+            case Key.Up:
+                if (GlobalSearchDropdown.Visibility != Visibility.Visible || !GlobalCitySearchList.HasItems)
+                    break;
+                {
+                    if (_dropdownHighlight <= 0)
+                    {
+                        _dropdownHighlight = -1;
+                        GlobalCitySearchList.SelectedIndex = -1;
+                        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, () => SetDropdownHighlight(-1));
+                    }
+                    else
+                    {
+                        int prev = _dropdownHighlight - 1;
+                        _dropdownHighlight = prev;
+                        GlobalCitySearchList.SelectedIndex = prev;
+                        GlobalCitySearchList.ScrollIntoView(GlobalCitySearchList.Items[prev]);
+                        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, () => SetDropdownHighlight(prev));
+                    }
                 }
                 e.Handled = true;
                 break;
@@ -411,10 +657,14 @@ public partial class MainWindow : Window
 
     private void GlobalCitySearch_LostFocus(object sender, RoutedEventArgs e)
     {
-        Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        // LostFocus fires even when focus moves to a ListBoxItem inside the dropdown
+        // (e.g. on mouse-hover).  Use a deferred check at Input priority — by then
+        // focus is stable and IsKeyboardFocusWithin is reliable.
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
-            if (!GlobalSearchDropdown.IsKeyboardFocusWithin)
-                HideGlobalDropdown();
+            bool within = GlobalSearchDropdown.IsKeyboardFocusWithin
+                       || GlobalCitySearchBox.IsKeyboardFocused;
+            if (!within) HideGlobalDropdown();
         });
     }
 
@@ -438,110 +688,94 @@ public partial class MainWindow : Window
         if (cts.IsCancellationRequested) return;
 
         GlobalCitySearchList.ItemsSource = results;
+        _dropdownHighlight = -1;  // reset highlight when new results arrive
         PositionAndShowDropdown();
     }
 
-    private void GlobalCitySearch_ResultSelected(object sender, SelectionChangedEventArgs e)
+    private void GlobalCitySearchList_MouseSelect(object sender, MouseButtonEventArgs e)
     {
-        if (sender is ListBox lb && lb.SelectedItem is CityEntry city)
+        if (e.OriginalSource is DependencyObject src)
         {
-            _vm.AddLocation(city.City, city.TimeZoneId, "", city.CountryFlag);
-            lb.SelectedItem = null;
-            HideGlobalDropdown();
-            GlobalCitySearchBox.Text = "";
-            GlobalCitySearchPlaceholder.Visibility = Visibility.Visible;
-            GlobalCitySearchBox.Focus();
+            var item = ItemsControl.ContainerFromElement(GlobalCitySearchList, src) as ListBoxItem;
+            if (item?.DataContext is CityEntry city)
+            {
+                CommitGlobalCity(city);
+                return;
+            }
+        }
+        if (GlobalCitySearchList.SelectedItem is CityEntry selected)
+            CommitGlobalCity(selected);
+    }
+
+    private void CommitGlobalCity(CityEntry city)
+    {
+        GlobalCitySearchList.SelectedItem = null;
+        HideGlobalDropdown();
+        _vm.Translator.SelectedSourceCity = city;
+        _vm.AddLocation(city.City, city.TimeZoneId, string.Empty, city.CountryFlag);
+        GlobalCitySearchBox.Text = "";
+        GlobalCitySearchPlaceholder.Visibility = Visibility.Visible;
+        GlobalCitySearchBox.Focus();
+    }
+
+    /// <summary>
+    /// Keyboard navigation inside GlobalCitySearchList when it somehow receives focus
+    /// (e.g. mouse click moved focus there). Delegates back to the same logic.
+    /// </summary>
+    private void GlobalCitySearchList_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Enter:
+                {
+                    int idx  = _dropdownHighlight >= 0 ? _dropdownHighlight : 0;
+                    var city = GlobalCitySearchList.Items.Count > idx
+                        ? GlobalCitySearchList.Items[idx] as CityEntry : null;
+                    if (city != null) CommitGlobalCity(city);
+                }
+                e.Handled = true;
+                break;
+
+            case Key.Escape:
+                HideGlobalDropdown();
+                GlobalCitySearchBox.Focus();
+                e.Handled = true;
+                break;
+
+            case Key.Down:
+                {
+                    int count = GlobalCitySearchList.Items.Count;
+                    int next  = _dropdownHighlight < count - 1 ? _dropdownHighlight + 1 : 0;
+                    _dropdownHighlight = next;
+                    GlobalCitySearchList.SelectedIndex = next;
+                    GlobalCitySearchList.ScrollIntoView(GlobalCitySearchList.Items[next]);
+                    _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, () => SetDropdownHighlight(next));
+                }
+                e.Handled = true;
+                break;
+
+            case Key.Up:
+                if (_dropdownHighlight <= 0)
+                {
+                    _dropdownHighlight = -1;
+                    GlobalCitySearchList.SelectedIndex = -1;
+                    _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, () => SetDropdownHighlight(-1));
+                    GlobalCitySearchBox.Focus();
+                }
+                else
+                {
+                    int prev = _dropdownHighlight - 1;
+                    _dropdownHighlight = prev;
+                    GlobalCitySearchList.SelectedIndex = prev;
+                    GlobalCitySearchList.ScrollIntoView(GlobalCitySearchList.Items[prev]);
+                    _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, () => SetDropdownHighlight(prev));
+                }
+                e.Handled = true;
+                break;
         }
     }
 
-    // ── Time Translator — source city search ──────────────────────────────────
-
-    private CancellationTokenSource _searchCts = new();
-
-    private void SourceCityBox_GotFocus(object sender, RoutedEventArgs e)
-    {
-        if (sender is TextBox tb) tb.SelectAll();
-        // Re-open popup if there is already text
-        if (!string.IsNullOrEmpty(SourceCityBox.Text))
-            _ = RunSearchAsync(SourceCityBox.Text);
-    }
-
-    private async void SourceCityBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        var text = SourceCityBox.Text;
-
-        SourceCityPlaceholder.Visibility =
-            string.IsNullOrEmpty(text) ? Visibility.Visible : Visibility.Collapsed;
-
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            SourceCityPopup.IsOpen = false;
-            return;
-        }
-
-        // Cancel any pending search from previous keystrokes
-        _searchCts.Cancel();
-        _searchCts = new CancellationTokenSource();
-        var cts = _searchCts;
-
-        // Open immediately so popup is visible during the async wait
-        SourceCityList.ItemsSource = null;
-        SourceCityPopup.IsOpen = true;
-
-        // Debounce: wait 150ms before searching so rapid typing doesn't pile up
-        try { await Task.Delay(150, cts.Token); }
-        catch (OperationCanceledException) { return; }
-
-        await RunSearchAsync(text, cts);
-    }
-
-    private async Task RunSearchAsync(string text, CancellationTokenSource? cts = null)
-    {
-        // Run scoring on a background thread — keeps UI fully responsive
-        IReadOnlyList<CityEntry> results;
-        try
-        {
-            results = await Task.Run(
-                () => WorldCitySearchService.Search(text),
-                cts?.Token ?? CancellationToken.None);
-        }
-        catch (OperationCanceledException) { return; }
-
-        if (cts?.IsCancellationRequested == true) return;
-
-        SourceCityList.ItemsSource = results;
-        SourceCityPopup.IsOpen     = results.Count > 0;
-    }
-
-    private void SourceCityBox_LostFocus(object sender, RoutedEventArgs e)
-    {
-        // Give the list a chance to receive the click before closing
-        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, () =>
-        {
-            if (!SourceCityList.IsKeyboardFocusWithin &&
-                !SourceCityPopup.IsKeyboardFocusWithin)
-                SourceCityPopup.IsOpen = false;
-        });
-    }
-
-    private void SourceCityList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (sender is ListBox lb && lb.SelectedItem is CityEntry city)
-        {
-            _vm.Translator.SelectedSourceCity = city;
-            lb.SelectedItem = null;
-            SourceCityPopup.IsOpen = false;
-        }
-    }
-
-    private void AddCityFromTranslator_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button { Tag: CityEntry city })
-        {
-            e.Handled = true;
-            _vm.AddLocation(city.City, city.TimeZoneId, string.Empty, city.CountryFlag);
-        }
-    }
+    // ── Source city is now set via CommitGlobalCity (unified search bar at top) ──
 
     private void SelectCurrentSlot()
     {
@@ -555,4 +789,46 @@ public partial class MainWindow : Window
         if (sender is Button { Tag: ClockLocation loc })
             _vm.RemoveLocation(loc);
     }
+
+    private void SetHomeLocation_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ClockLocation loc }) return;
+        if (loc.IsHome)
+            _vm.ClearHomeLocation();
+        else
+            _vm.SetHomeLocation(loc);
+    }
+
+    private void ToggleEditMode_Click(object sender, MouseButtonEventArgs e)
+    {
+        var ts = ThemeService.Instance;
+        bool next = !ts.EditMode;
+        ts.EditMode   = next;
+        ts.DeleteMode = false;   // mutually exclusive
+    }
+
+    private void ToggleDeleteMode_Click(object sender, MouseButtonEventArgs e)
+    {
+        var ts = ThemeService.Instance;
+        bool next = !ts.DeleteMode;
+        ts.DeleteMode = next;
+        ts.EditMode   = false;   // mutually exclusive
+    }
+
+    /// <summary>Visually highlights the active mode button with a coloured background.</summary>
+    private void UpdateModeButtonStates()
+    {
+        var ts = ThemeService.Instance;
+
+        // Edit border: cyan tint when active
+        EditModeBtnBorder.Background = ts.EditMode
+            ? new SolidColorBrush(Color.FromArgb(0x55, 0x00, 0xE5, 0xFF))
+            : Brushes.Transparent;
+
+        // Delete border: red tint when active
+        DeleteModeBtnBorder.Background = ts.DeleteMode
+            ? new SolidColorBrush(Color.FromArgb(0x55, 0xC6, 0x28, 0x28))
+            : Brushes.Transparent;
+    }
 }
+

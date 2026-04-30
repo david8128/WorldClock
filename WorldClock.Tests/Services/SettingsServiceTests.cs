@@ -41,17 +41,17 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var s = _svc.Load();
         s.ThemeName.Should().Be("Dark Default");
-        s.Opacity.Should().Be(0.1, "first-run default must be maximum transparency");
+        s.Opacity.Should().Be(0.5, "first-run default is 50% opacity");
         s.Cities.Should().BeEmpty();
     }
 
     [Fact]
-    public void SettingsService_DefaultOpacity_IsMaximumTransparency()
+    public void SettingsService_DefaultOpacity_IsHalfTransparency()
     {
-        // Regression guard: default opacity must always be 0.1 (slider fully transparent).
+        // Regression guard: default opacity is 0.5 (50% — semi-transparent on first run).
         var s = new UserSettings();
-        s.Opacity.Should().Be(0.1,
-            "UserSettings.Opacity default must be 0.1 so the app launches at max transparency");
+        s.Opacity.Should().Be(0.5,
+            "UserSettings.Opacity default must be 0.5 so the app launches at 50% transparency");
     }
 
     // ── Round-trip ─────────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ public sealed class SettingsServiceTests : IDisposable
 
         var s = _svc.Load();
         s.ThemeName.Should().Be("Dark Default");
-        s.Opacity.Should().Be(0.1);
+        s.Opacity.Should().Be(0.5);
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public sealed class SettingsServiceTests : IDisposable
         var s = _svc.Load();
         // Deserialized from "{}" — property defaults come from UserSettings ctor.
         s.ThemeName.Should().Be("Dark Default");
-        s.Opacity.Should().Be(0.1);
+        s.Opacity.Should().Be(0.5);
     }
 
     // ── Partial save / merge behaviour (theme saves, cities preserved) ─────────

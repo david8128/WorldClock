@@ -270,6 +270,10 @@
                                                                         <Trigger Property="IsMouseOver" Value="True">
                                                                             <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF"/>
                                                                         </Trigger>
+                                                                        <Trigger Property="IsSelected" Value="True">
+                                                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BrushAccentCyan}"/>
+                                                                            <Setter Property="Foreground" Value="#0D1117"/>
+                                                                        </Trigger>
                                                                     </ControlTemplate.Triggers>
                                                                 </ControlTemplate>
                                                             </Setter.Value>
@@ -291,6 +295,20 @@
                                                                            FontWeight="SemiBold"
                                                                            Foreground="{DynamicResource BrushTextPrimary}"
                                                                            VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                                <TextBlock Text="{Binding PrimaryCode}"
+                                                                           FontSize="10" FontFamily="Consolas"
+                                                                           Foreground="{DynamicResource BrushTextDim}"
+                                                                           VerticalAlignment="Center" Margin="0,0,6,0">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Style.Triggers>
+                                                                                <Trigger Property="Text" Value="">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                </Trigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
                                                                 <TextBlock Text="{Binding Country}" FontSize="10"
                                                                            Foreground="{DynamicResource BrushTextDim}"
                                                                            VerticalAlignment="Center"/>

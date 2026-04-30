@@ -7,7 +7,7 @@ using WorldClock.Models;
 namespace WorldClock.ViewModels;
 
 /// <summary>
-/// Drives the Time Translator panel: a WTB-style 24-hour grid across all configured
+/// Drives the Time Visualizer panel: a WTB-style 24-hour grid across all configured
 /// timezones, with city-search source selection, date navigation, and point-in-time
 /// result cards.  All legacy properties are preserved for backward test compatibility.
 /// </summary>
@@ -28,7 +28,9 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
     private string       _hour       = DateTime.Now.Hour.ToString("D2");
     private string       _minute     = DateTime.Now.Minute.ToString("D2");
     private TimeZoneInfo _sourceZone = TimeZoneInfo.Utc;
-    private bool         _isOpen;
+    private TimeZoneInfo? _homeZone;          // home location's timezone (null = not set)
+    private bool         _isOpen = true;   // expanded by default
+    private bool         _hasExplicitSelection;
     private int _selectionStart = DateTime.Now.Hour * 2;
     private int _selectionEnd   = DateTime.Now.Hour * 2;
 
@@ -85,13 +87,14 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
     public int SelectionStart => _selectionStart;
     public int SelectionEnd   => _selectionEnd;
 
+    /// <summary>True when the user has explicitly clicked/dragged a slot on the timeline.</summary>
+    public bool HasSelection  => _hasExplicitSelection && Results.Count > 0;
+
     /// <summary>e.g. "09:00 – 10:30" shown in the toggle bar digital display.</summary>
     public string SelectionWindowLabel
     {
         get
         {
-            // Each slot is 30 min wide. The visible end of the selection
-            // is the START of the next slot (selectionEnd + 1).
             static string SlotTime(int slot)
             {
                 int h = (slot / 2) % 24;
@@ -113,6 +116,7 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         if (start > end) (start, end) = (end, start);
         start = Math.Clamp(start, 0, 47);
         end   = Math.Clamp(end,   0, 47);
+        _hasExplicitSelection = true;
 
         // Clear old highlight
         foreach (var col in Columns)        col.IsSelected = false;
@@ -236,11 +240,25 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         Translate();
     }
 
+    /// <summary>
+    /// Called by MainViewModel when the home location changes.
+    /// Sets the home timezone used as the grid's reference point (column headers + day-diff anchor).
+    /// Pass null to clear the home zone and fall back to the user-selected source zone.
+    /// </summary>
+    public void SetHomeZone(TimeZoneInfo? tz)
+    {
+        _homeZone = tz;
+        BuildGrid();
+        Translate();
+    }
+
     // ── Build transposed grid: columns = 48 half-hour slots, rows = cities ─────
     public void BuildGrid()
     {
         var date    = _date ?? DateTime.Today;
-        var srcZone = _sourceZone;
+        // When a home location is set, its timezone drives the column headers so the
+        // home row always "coincides" with (shows the same times as) the header.
+        var srcZone = _homeZone ?? _sourceZone;
 
         // ── Columns: 48 half-hour slots (0 = 00:00 … 47 = 23:30) ────────────
         Columns.Clear();
@@ -248,16 +266,71 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         {
             Columns.Add(new TimeGridColumn
             {
-                SlotIndex   = s,
-                SlotLabel   = s % 2 == 0 ? $"{s / 2:D2}" : "",
-                IsHourStart = s % 2 == 0,
-                IsSelected  = s >= _selectionStart && s <= _selectionEnd,
+                SlotIndex      = s,
+                SlotLabel      = s % 2 == 0 ? ToAmPmHour(s / 2) : "",
+                IsHourStart    = s % 2 == 0,
+                IsSelected     = s >= _selectionStart && s <= _selectionEnd,
+                IsMidnight     = s == 0,
+                DayOfWeekLabel = s == 0 ? date.ToString("ddd") : "",
+                DateShortLabel = s == 0 ? date.ToString("MMM d") : "",
             });
         }
 
-        // ── Rows: one per configured city, each with 48 cells ────────────────
+        // ── Rows: one per configured city + UTC row at the top (only if not already in locations) ───
         Rows.Clear();
-        foreach (var loc in _locations)
+        bool hasUtcLocation = _locations.Any(l =>
+            string.Equals(l.TimeZoneId, TimeZoneInfo.Utc.Id, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(l.TimeZoneId, "UTC", StringComparison.OrdinalIgnoreCase));
+
+        // UTC row always first (unless user already added a UTC location manually)
+        if (!hasUtcLocation)
+        {
+            var utcCells = new List<TimeGridCell>(48);
+            for (int s = 0; s < 48; s++)
+            {
+                var h   = s / 2;
+                var min = (s % 2) * 30;
+                var srcTime = new DateTime(date.Year, date.Month, date.Day, h, min, 0,
+                                           DateTimeKind.Unspecified);
+                DateTime utcSlot;
+                try   { utcSlot = TimeZoneInfo.ConvertTimeToUtc(srcTime, srcZone); }
+                catch { utcSlot = TimeZoneInfo.ConvertTimeToUtc(srcTime.AddHours(1), srcZone); }
+                // Day diff relative to home timezone (or source zone if no home set)
+                var anchorDate = _homeZone != null
+                    ? TimeZoneInfo.ConvertTimeFromUtc(utcSlot, _homeZone).Date
+                    : date.Date;
+                var dayDiff = (utcSlot.Date - anchorDate).Days;
+                var diffStr = dayDiff > 0 ? $"+{dayDiff}" : "";  // suppress negative offsets
+                utcCells.Add(new TimeGridCell
+                {
+                    SlotIndex  = s,
+                    TimeStr    = utcSlot.ToString("HH:mm"),
+                    DayDiff    = diffStr,
+                    Band       = GetTimeBand(utcSlot.Hour),
+                    IsSelected = s >= _selectionStart && s <= _selectionEnd,
+                });
+            }
+            var utcSelCell = utcCells[Math.Min(_selectionStart, 47)];
+            var utcSdiff   = string.IsNullOrEmpty(utcSelCell.DayDiff) ? 0
+                             : int.Parse(utcSelCell.DayDiff.TrimStart('+'));
+            var utcRow = new TimeGridRow
+            {
+                CityName    = "UTC",
+                CountryFlag = "🌐",
+                Country     = "Universal Time",
+                UtcOffset   = "UTC+00:00",
+                AccentBrush = new System.Windows.Media.SolidColorBrush(
+                                  System.Windows.Media.Color.FromRgb(0x88, 0x88, 0xAA)),
+                IsSource    = _sourceZone.Id == TimeZoneInfo.Utc.Id,
+                Cells       = utcCells,
+            };
+            utcRow.DateLabel   = date.AddDays(utcSdiff).ToString("ddd, MMM d");
+            utcRow.DateDayDiff = utcSdiff;
+            Rows.Add(utcRow);
+        } // end if (!hasUtcLocation)
+
+        // Home location row first, then others — preserves original insertion order for non-home rows
+        foreach (var loc in _locations.OrderByDescending(l => l.IsHome))
         {
             TimeZoneInfo locTz;
             try   { locTz = TimeZoneInfo.FindSystemTimeZoneById(loc.TimeZoneId); }
@@ -273,16 +346,20 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
             {
                 var h   = s / 2;
                 var min = (s % 2) * 30;
-
                 var srcTime = new DateTime(date.Year, date.Month, date.Day, h, min, 0,
                                            DateTimeKind.Unspecified);
                 DateTime utc;
                 try   { utc = TimeZoneInfo.ConvertTimeToUtc(srcTime, srcZone); }
                 catch { utc = TimeZoneInfo.ConvertTimeToUtc(srcTime.AddHours(1), srcZone); }
 
-                var local   = TimeZoneInfo.ConvertTimeFromUtc(utc, locTz);
-                var dayDiff = (local.Date - date.Date).Days;
-                var diffStr = dayDiff > 0 ? $"+{dayDiff}" : dayDiff < 0 ? $"{dayDiff}" : "";
+                var local = TimeZoneInfo.ConvertTimeFromUtc(utc, locTz);
+                // Day diff relative to home timezone so we only ever show "+1d" (next day),
+                // never "-1d". If home is not set, fall back to source date as anchor.
+                var anchorDate = _homeZone != null
+                    ? TimeZoneInfo.ConvertTimeFromUtc(utc, _homeZone).Date
+                    : date.Date;
+                var dayDiff = (local.Date - anchorDate).Days;
+                var diffStr = dayDiff > 0 ? $"+{dayDiff}" : "";  // suppress negatives
 
                 cells.Add(new TimeGridCell
                 {
@@ -303,6 +380,7 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
             {
                 CityName    = loc.CityName,
                 CountryFlag = loc.CountryFlag,
+                Country     = string.IsNullOrWhiteSpace(loc.TeamLabel) ? string.Empty : loc.TeamLabel,
                 UtcOffset   = offStr,
                 AccentBrush = loc.AccentBrush,
                 IsSource    = loc.TimeZoneId == srcZone.Id,
@@ -317,7 +395,8 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
     // ── Point-in-time translation (populates Results) ─────────────────────────
     public void Translate()
     {
-        var date = _date ?? DateTime.Today;
+        var date    = _date ?? DateTime.Today;
+        var srcZone = _homeZone ?? _sourceZone;
 
         if (!int.TryParse(_hour,   out var h)) h = 0;
         if (!int.TryParse(_minute, out var m)) m = 0;
@@ -327,28 +406,61 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         var input = new DateTime(date.Year, date.Month, date.Day, h, m, 0,
                                  DateTimeKind.Unspecified);
         DateTime utc;
-        try   { utc = TimeZoneInfo.ConvertTimeToUtc(input, _sourceZone); }
-        catch { utc = TimeZoneInfo.ConvertTimeToUtc(input.AddHours(1), _sourceZone); }
+        try   { utc = TimeZoneInfo.ConvertTimeToUtc(input, srcZone); }
+        catch { utc = TimeZoneInfo.ConvertTimeToUtc(input.AddHours(1), srcZone); }
 
         // Compute selection-end UTC for the window end time shown in cards.
-        // The end of the selection is the START of slot (selectionEnd + 1),
-        // which represents the close of the last 30-min block.
-        // e.g. slots 24–26 selected → end = slot 27 = 13:30.
-        bool hasRange  = _selectionEnd > _selectionStart;
-        int  endSlot   = _selectionEnd + 1;          // first slot AFTER selection
-        int  endH      = (endSlot / 2) % 24;
-        int  endMin    = (endSlot % 2) * 30;
-        bool endNextDay = endSlot >= 48;             // wraps past midnight
-        var  endBase   = new DateTime(date.Year, date.Month, date.Day, endH, endMin, 0,
-                                      DateTimeKind.Unspecified);
-        var  endInput  = endNextDay ? endBase.AddDays(1) : endBase;
+        // The end of the selection is the START of slot (selectionEnd + 1).
+        bool hasRange   = _selectionEnd > _selectionStart;
+        int  endSlot    = _selectionEnd + 1;
+        int  endH       = (endSlot / 2) % 24;
+        int  endMin     = (endSlot % 2) * 30;
+        bool endNextDay = endSlot >= 48;
+        var  endBase    = new DateTime(date.Year, date.Month, date.Day, endH, endMin, 0,
+                                       DateTimeKind.Unspecified);
+        var  endInput   = endNextDay ? endBase.AddDays(1) : endBase;
         DateTime utcEnd;
-        try   { utcEnd = TimeZoneInfo.ConvertTimeToUtc(endInput, _sourceZone); }
-        catch { utcEnd = TimeZoneInfo.ConvertTimeToUtc(endInput.AddHours(1), _sourceZone); }
+        try   { utcEnd = TimeZoneInfo.ConvertTimeToUtc(endInput, srcZone); }
+        catch { utcEnd = TimeZoneInfo.ConvertTimeToUtc(endInput.AddHours(1), srcZone); }
 
         var utcDto = new DateTimeOffset(utc, TimeSpan.Zero);
 
+        // ── Populate row-level translated times ───────────────────────────────
+        // Rows may be reordered (home first) so we match by CityName, not by index.
+        // The implicit UTC row (added when no UTC city in _locations) has CityName="UTC".
+        bool hasUtcRow = Rows.Count > 0 && Rows[0].CityName == "UTC"
+                         && !_locations.Any(l =>
+                                string.Equals(l.TimeZoneId, "UTC", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(l.TimeZoneId, TimeZoneInfo.Utc.Id, StringComparison.OrdinalIgnoreCase));
+        if (hasUtcRow)
+        {
+            var utcRow = Rows[0];
+            utcRow.SelectedTimeStr    = utc.ToString("HH:mm");
+            utcRow.SelectedEndTimeStr = hasRange ? utcEnd.ToString("HH:mm") : null;
+            utcRow.HasRange           = hasRange;
+            utcRow.IsDst              = false;
+            utcRow.ShowTranslatedTime = _hasExplicitSelection;
+        }
+        // Match each location to its row by CityName (order-independent, handles home-first reorder)
+        foreach (var loc in _locations)
+        {
+            var row = Rows.FirstOrDefault(r => r.CityName == loc.CityName);
+            if (row == null) continue;
+            TimeZoneInfo tz;
+            try   { tz = TimeZoneInfo.FindSystemTimeZoneById(loc.TimeZoneId); }
+            catch { continue; }
+            var local = TimeZoneInfo.ConvertTimeFromUtc(utc, tz);
+            row.SelectedTimeStr    = local.ToString("HH:mm");
+            row.SelectedEndTimeStr = hasRange
+                ? TimeZoneInfo.ConvertTimeFromUtc(utcEnd, tz).ToString("HH:mm")
+                : null;
+            row.HasRange           = hasRange;
+            row.IsDst              = tz.IsDaylightSavingTime(utcDto);
+            row.ShowTranslatedTime = _hasExplicitSelection;
+        }
+
         Results.Clear();
+        // Results contains location entries only (UTC is already shown via Rows[0])
         foreach (var loc in _locations)
         {
             TimeZoneInfo tz;
@@ -379,6 +491,7 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
                 AccentBrush = loc.AccentBrush,
             });
         }
+        OnPropertyChanged(nameof(HasSelection));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -389,6 +502,13 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         >= 18 and <= 21 => TimeBand.Evening,
         _               => TimeBand.Night,
     };
+
+    private static string ToAmPmHour(int hour24)
+    {
+        bool pm  = hour24 >= 12;
+        int  h12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+        return $"{h12}{(pm ? "p" : "a")}";
+    }
 
     // ── INotifyPropertyChanged ────────────────────────────────────────────────
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -92,10 +92,10 @@ public sealed class TimeTranslatorViewModelTests
     }
 
     [Fact]
-    public void Constructor_IsOpen_DefaultIsFalse()
+    public void Constructor_IsOpen_DefaultIsTrue()
     {
         var vm = new TimeTranslatorViewModel(new ObservableCollection<ClockLocation>());
-        vm.IsOpen.Should().BeFalse();
+        vm.IsOpen.Should().BeTrue("Time Visualizer is expanded by default");
     }
 
     [Fact]
@@ -257,13 +257,13 @@ public sealed class TimeTranslatorViewModelTests
     // ── IsOpen toggle ─────────────────────────────────────────────────────────
 
     [Fact]
-    public void IsOpen_SetTrue_FiresPropertyChanged()
+    public void IsOpen_SetFalse_FiresPropertyChanged()
     {
         var vm      = new TimeTranslatorViewModel(new ObservableCollection<ClockLocation>());
         var changed = new List<string?>();
         vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
-        vm.IsOpen = true;
+        vm.IsOpen = false;   // starts true, toggling to false fires the event
         changed.Should().Contain(nameof(vm.IsOpen));
     }
 

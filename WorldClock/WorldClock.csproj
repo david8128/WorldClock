@@ -17,6 +17,15 @@
     <Resource Include="Images\Logo.png"/>
   </ItemGroup>
 
+  <!-- Exclude Python virtual environment (contains Linux symlinks unresolvable on Windows) -->
+  <ItemGroup>
+    <Compile Remove="citiesdb\**"/>
+    <Page Remove="citiesdb\**"/>
+    <None Remove="citiesdb\**"/>
+    <EmbeddedResource Remove="citiesdb\**"/>
+    <Content Remove="citiesdb\**"/>
+  </ItemGroup>
+
   <ItemGroup>
     <!-- Allow the test project to access internal members (AcrylicHelper, AcrylicTier, etc.) -->
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">

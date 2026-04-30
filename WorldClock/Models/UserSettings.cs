@@ -11,12 +11,15 @@ public sealed class UserSettings
 
     /// <summary>
     /// Opacity level (0.1–1.0 where 0.1 = maximum transparency, 1.0 = most opaque).
-    /// Defaults to 0.1 so the window is maximally transparent on first launch.
+    /// Default is 0.5 (50% opacity — visually semi-transparent).
     /// </summary>
-    public double Opacity { get; set; } = 0.1;
+    public double Opacity { get; set; } = 0.5;
 
     /// <summary>Ordered list of city clocks to restore (UTC is always first and implicit).</summary>
     public List<SavedCity> Cities { get; set; } = [];
+
+    /// <summary>TimeZoneId of the user's home city (empty = none set).</summary>
+    public string HomeLocationId { get; set; } = string.Empty;
 
     /// <summary>Window scale mode. Defaults to ProportionScale (elements shrink with window).</summary>
     public ScaleMode ScaleMode { get; set; } = ScaleMode.ProportionScale;

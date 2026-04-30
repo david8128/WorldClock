@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
+using WorldClock.Helpers;
+using WorldClock.Services;
 
 namespace WorldClock.Models;
 
@@ -27,6 +29,36 @@ public sealed class ClockLocation : INotifyPropertyChanged
     // ── Immutable identity ────────────────────────────────────────────────────
     public required string          TimeZoneId  { get; init; }
     public required SolidColorBrush AccentBrush { get; init; }
+
+    /// <summary>Returns a light-theme variant of <see cref="AccentBrush"/> that keeps the original
+    /// hue and saturation but reduces the HSV Value until WCAG AA contrast (4.5:1) against white
+    /// is met. Dark themes always get the original vivid color unchanged.
+    /// Call <see cref="NotifyThemeChanged"/> when the active theme switches.</summary>
+    public SolidColorBrush ThemedAccentBrush => ThemeColorHelper.ThemedBrush(AccentBrush);
+
+    /// <summary>Raises PropertyChanged for <see cref="ThemedAccentBrush"/> after a theme switch.</summary>
+    public void NotifyThemeChanged() => OnPropertyChanged(nameof(ThemedAccentBrush));
+
+    // ── Home location ─────────────────────────────────────────────────────────
+    private bool   _isHome;
+    private string _diffFromHome = string.Empty;
+
+    /// <summary>True when this city is marked as the user's home location.</summary>
+    public bool IsHome
+    {
+        get => _isHome;
+        set { _isHome = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Formatted time difference relative to home, e.g. "+3h", "-5h 30m", or "HOME".</summary>
+    public string DiffFromHome
+    {
+        get => _diffFromHome;
+        set { _diffFromHome = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasDiffFromHome)); }
+    }
+
+    /// <summary>True when a home location is set and this card should show the time difference badge.</summary>
+    public bool HasDiffFromHome => !string.IsNullOrEmpty(_diffFromHome);
 
     // ── Mutable display properties ────────────────────────────────────────────
     public required string CityName

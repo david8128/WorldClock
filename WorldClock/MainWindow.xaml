@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WorldClock"
+        xmlns:helpers="clr-namespace:WorldClock.Helpers"
         mc:Ignorable="d"
         Title="World Clock" Icon="Images/Logo.ico" Height="760" Width="1100"
         MinHeight="300" MinWidth="430"
@@ -25,6 +26,7 @@
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <helpers:SlotIndexToCanvasLeftConverter x:Key="SlotToPx"/>
 
         <Style x:Key="DigitalTime" TargetType="TextBlock">
             <Setter Property="FontFamily"    Value="Consolas"/>
@@ -121,20 +123,18 @@
         </Style>
     </Window.Resources>
 
-    <!-- Responsive root: the inner Grid grows to fill the window at any size.
-         ScaleScrollViewer + ScaleViewbox + DesignRoot are kept as named elements
-         so the code-behind ApplyScaleMode() method can still reference them
-         without errors; they just don't constrain the layout anymore. -->
+    <!-- Responsive root: Viewbox.Stretch="Uniform" scales the fixed 1100×760 design
+         proportionally to fill any window size (ProportionScale default).
+         MinLimit mode keeps minimum pixel dimensions and shows scrollbars below them.
+         ApplyScaleMode() in code-behind switches between the two modes. -->
     <ScrollViewer x:Name="ScaleScrollViewer"
                   HorizontalScrollBarVisibility="Disabled"
-                  VerticalScrollBarVisibility="Auto"
+                  VerticalScrollBarVisibility="Disabled"
                   Background="{DynamicResource BrushBackgroundDark}">
-        <!-- Viewbox is kept for ProportionScale mode but defaults to pass-through -->
-        <Viewbox x:Name="ScaleViewbox" Stretch="None">
+        <!-- Stretch="Uniform" scales the 1100×760 design to fit any window size -->
+        <Viewbox x:Name="ScaleViewbox" Stretch="Uniform">
             <Grid x:Name="DesignRoot"
-                  Width="{Binding ActualWidth,
-                         RelativeSource={RelativeSource AncestorType=ScrollViewer}}"
-                  MinHeight="300">
+                  Width="1100" Height="760">
 
     <!-- Root: semi-transparent so the acrylic blur shows through when opacity < 1 -->
     <Border Background="{DynamicResource BrushBackgroundDark}">
@@ -142,9 +142,8 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>  <!-- 0: header -->
                 <RowDefinition Height="Auto"/>  <!-- 1: UTC banner -->
-                <RowDefinition Height="Auto"/>  <!-- 2: time translator (contains add-city search) -->
-                <RowDefinition Height="*"/>     <!-- 3: location cards -->
-                <RowDefinition Height="Auto"/>  <!-- 4: footer -->
+                <RowDefinition Height="*"/>     <!-- 2: main content (left clocks + right translator) -->
+                <RowDefinition Height="Auto"/>  <!-- 3: footer -->
             </Grid.RowDefinitions>
 
             <!-- HEADER / TITLE BAR -->
@@ -267,84 +266,667 @@
                 </Grid>
             </Border>
 
-            <!-- TIME TRANSLATOR -->
-            <Border Grid.Row="2"
-                    Background="{DynamicResource BrushBackgroundMid}"
-                    Margin="16,10,16,0" CornerRadius="10">
-                <StackPanel>
-                    <!-- Toggle bar -->
-                    <Button Background="Transparent" BorderThickness="0"
-                            HorizontalAlignment="Stretch"
-                            HorizontalContentAlignment="Stretch"
-                            Padding="16,10" Cursor="Hand"
-                            AutomationProperties.Name="ToggleTranslatorButton"
-                            Click="ToggleTranslator_Click">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="🕐" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center">
-                                    <TextBlock.Effect>
-                                        <DropShadowEffect Color="White" BlurRadius="24" ShadowDepth="0"
-                                                          Opacity="{DynamicResource GlowOpacitySubtle}"/>
-                                    </TextBlock.Effect>
-                                </TextBlock>
-                                <TextBlock Text="TIME TRANSLATOR"
-                                           FontFamily="Consolas" FontSize="12" FontWeight="Bold"
-                                           Foreground="{DynamicResource BrushAccentCyan}"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <Rectangle Grid.Column="1" Height="1" Margin="16,0"
-                                       Fill="{DynamicResource BrushSeparator}" VerticalAlignment="Center"/>
-                            <!-- Selection window label (shows e.g. "09:00 – 10:30") -->
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Translator.SelectionWindowLabel}"
-                                           FontFamily="Consolas" FontSize="13" FontWeight="Bold"
-                                           Foreground="{DynamicResource BrushAccentCyan}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Translator.IsOpen}" Value="False">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
+            <!-- MAIN CONTENT: left vertical clocks sidebar + right time visualizer -->
+            <Grid x:Name="MainContentGrid" Grid.Row="2" Margin="16,10,16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="ClocksColumnDef" Width="220"/>  <!-- left: compact vertical clocks panel -->
+                    <ColumnDefinition x:Name="VisualizerColumnDef" Width="*"/>    <!-- right: time visualizer -->
+                </Grid.ColumnDefinitions>
+
+                <!-- ══════════════════════════════════════════════════════
+                     LEFT PANEL — compact vertical clock list
+                     Replaces the old horizontal bottom cards (WrapPanel).
+                     Each row: accent bar | drag | flag | city + time + offset
+                     ══════════════════════════════════════════════════════ -->
+                <Border x:Name="ClocksPanelBorder" Grid.Column="0"
+                        Background="{DynamicResource BrushBackgroundMid}"
+                        CornerRadius="10,0,0,10" Margin="0,0,2,0">
+                    <DockPanel>
+                        <!-- Panel header -->
+                        <Border x:Name="ClocksPanelHeader" DockPanel.Dock="Top"
+                                Background="{DynamicResource BrushBackgroundCard}"
+                                CornerRadius="10,0,0,0" Padding="12,8">
+                            <Grid>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🕐" FontSize="13" Margin="0,0,6,0"
+                                               VerticalAlignment="Center">
+                                        <TextBlock.Effect>
+                                            <DropShadowEffect Color="White" BlurRadius="16"
+                                                              ShadowDepth="0"
+                                                              Opacity="{DynamicResource GlowOpacitySubtle}"/>
+                                        </TextBlock.Effect>
+                                    </TextBlock>
+                                    <TextBlock Text="CLOCKS"
+                                               FontFamily="Consolas" FontSize="10" FontWeight="Bold"
+                                               Foreground="{DynamicResource BrushAccentCyan}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <!-- Right-side mini-settings: Edit + Delete toggles + re-open button -->
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <!-- Edit mode toggle (✏) -->
+                                    <Border x:Name="EditModeBtnBorder" CornerRadius="5"
+                                            Width="22" Height="22" Cursor="Hand"
+                                            ToolTip="Toggle edit mode"
+                                            MouseLeftButtonUp="ToggleEditMode_Click">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#33FFFFFF"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="✏" FontSize="11"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource BrushTextDim}"/>
+                                    </Border>
+                                    <!-- Delete mode toggle (🗑) -->
+                                    <Border x:Name="DeleteModeBtnBorder" CornerRadius="5"
+                                            Width="22" Height="22" Cursor="Hand" Margin="2,0,0,0"
+                                            ToolTip="Toggle delete mode"
+                                            MouseLeftButtonUp="ToggleDeleteMode_Click">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#33FFFFFF"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="🗑" FontSize="11"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource BrushTextDim}"/>
+                                    </Border>
+                                    <!-- Re-open Time Visualizer (only when visualizer is collapsed) -->
+                                    <Button HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                            Foreground="{DynamicResource BrushAccentCyan}"
+                                            ToolTip="Open Time Visualizer" Margin="4,0,0,0"
+                                            Click="ToggleTranslator_Click">
+                                        <TextBlock FontFamily="Consolas" FontSize="9" FontWeight="Bold"
+                                                   Text="⏱ ▶ VISUALIZER"/>
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border x:Name="Bd" Background="Transparent"
+                                                                    CornerRadius="4" Padding="6,2">
+                                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                                  VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Translator.IsOpen}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border DockPanel.Dock="Top" Height="1"
+                                Background="{DynamicResource BrushSeparator}"/>
+                        <!-- Auto-scaling clock list: Viewbox Uniform scales all cards
+                             proportionally so text never distorts. The window-grow mechanism
+                             (UpdateWindowSizeForClocks) ensures the available height grows
+                             when many clocks are added, so cards stay at natural size. -->
+                        <Viewbox Stretch="Uniform" VerticalAlignment="Top" HorizontalAlignment="Stretch">
+                            <ItemsControl x:Name="LocationsPanel" ItemsSource="{Binding Locations}"
+                                          Width="220">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Vertical"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border AllowDrop="True"
+                                                Margin="0,0,0,1"
+                                                Background="{DynamicResource BrushBackgroundMid}"
+                                                DragOver="Card_DragOver"
+                                                DragLeave="Card_DragLeave"
+                                                Drop="Card_Drop">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource BrushBackgroundCard}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Grid MinHeight="72">
+                                                <!-- Left accent bar -->
+                                                <Border HorizontalAlignment="Left" Width="4"
+                                                        CornerRadius="2" Margin="0,4,0,4"
+                                                        Background="{Binding ThemedAccentBrush}"/>
+
+                                                <!-- NORMAL VIEW -->
+                                                <Grid Margin="10,6,6,6">
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>  <!-- drag handle -->
+                                                        <ColumnDefinition Width="Auto"/>  <!-- flag -->
+                                                        <ColumnDefinition Width="*"/>     <!-- city + time + offset -->
+                                                    </Grid.ColumnDefinitions>
+                                                    <!-- Drag handle -->
+                                                    <TextBlock Grid.Column="0" Text="⠇" FontSize="13"
+                                                               Foreground="{DynamicResource BrushTextDim}"
+                                                               VerticalAlignment="Center" Margin="0,0,4,0"
+                                                               Cursor="SizeAll" ToolTip="Drag to reorder"
+                                                               PreviewMouseLeftButtonDown="DragHandle_MouseDown"/>
+                                                    <!-- Flag -->
+                                                    <TextBlock Grid.Column="1" Text="{Binding CountryFlag}"
+                                                               FontSize="22" VerticalAlignment="Center"
+                                                               Margin="0,0,6,0">
+                                                        <TextBlock.Effect>
+                                                            <DropShadowEffect Color="White" BlurRadius="16"
+                                                                              ShadowDepth="0"
+                                                                              Opacity="{DynamicResource GlowOpacitySubtle}"/>
+                                                        </TextBlock.Effect>
+                                                    </TextBlock>
+                                                    <!-- City, time, offset -->
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                        <!-- City name + HOME badge -->
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding CityName}"
+                                                                       FontSize="13" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource BrushTextPrimary}"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       VerticalAlignment="Center"/>
+                                                            <Border CornerRadius="3" Padding="3,0" Margin="4,0,0,0"
+                                                                    Background="{DynamicResource BrushAccentCyan}">
+                                                                <TextBlock Text="HOME" FontFamily="Consolas" FontSize="7"
+                                                                           FontWeight="Bold" Foreground="#0D1117"
+                                                                           VerticalAlignment="Center"/>
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsHome}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Border.Style>
+                                                            </Border>
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding TeamLabel}"
+                                                                   FontSize="9"
+                                                                   Foreground="{DynamicResource BrushTextDim}"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   Margin="0,0,0,1">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding TeamLabel}" Value="">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding CurrentTime}"
+                                                                   FontFamily="Consolas" FontSize="18"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{Binding ThemedAccentBrush}">
+                                                            <TextBlock.Effect>
+                                                                <DropShadowEffect BlurRadius="8" ShadowDepth="0"
+                                                                                  Opacity="{DynamicResource GlowOpacity}"
+                                                                                  Color="#00BFFF"/>
+                                                            </TextBlock.Effect>
+                                                        </TextBlock>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding UtcOffset}"
+                                                                       FontFamily="Consolas" FontSize="10"
+                                                                       Foreground="{Binding ThemedAccentBrush}"/>
+                                                            <Border CornerRadius="2" Padding="3,1" Margin="4,0,0,0"
+                                                                    Background="{DynamicResource BrushBackgroundDark}">
+                                                                <TextBlock Text="{Binding DstLabel}"
+                                                                           FontFamily="Consolas" FontSize="9"
+                                                                           FontWeight="Bold">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource BrushTextDim}"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsDst}" Value="True">
+                                                                                    <Setter Property="Foreground" Value="{DynamicResource BrushDstActive}"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </Border>
+                                                            <!-- Diff-from-home badge -->
+                                                            <Border CornerRadius="2" Padding="3,1" Margin="4,0,0,0"
+                                                                    Background="#22FFFFFF">
+                                                                <TextBlock Text="{Binding DiffFromHome}"
+                                                                           FontFamily="Consolas" FontSize="9"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="{DynamicResource BrushTextDim}"/>
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding HasDiffFromHome}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Border.Style>
+                                                            </Border>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <!-- EDIT VIEW -->
+                                                <Grid Margin="10,6,6,6">
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
+                                                    <StackPanel>
+                                                        <TextBlock Text="✏ EDIT"
+                                                                   FontFamily="Consolas" FontSize="8" FontWeight="Bold"
+                                                                   Foreground="{DynamicResource BrushAccentCyan}"
+                                                                   Margin="0,0,0,4"/>
+                                                        <Grid Margin="0,0,0,3">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="28"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBox Grid.Column="0"
+                                                                     Text="{Binding EditingCountryFlag, UpdateSourceTrigger=PropertyChanged}"
+                                                                     Style="{StaticResource CardEditBox}"
+                                                                     FontSize="13" Padding="2"
+                                                                     Margin="0,0,2,0" ToolTip="Flag emoji"/>
+                                                            <TextBox Grid.Column="1"
+                                                                     Text="{Binding EditingCityName, UpdateSourceTrigger=PropertyChanged}"
+                                                                     Style="{StaticResource CardEditBox}"
+                                                                     FontSize="10" ToolTip="City name"/>
+                                                        </Grid>
+                                                        <TextBox Text="{Binding EditingTeamLabel, UpdateSourceTrigger=PropertyChanged}"
+                                                                 Style="{StaticResource CardEditBox}"
+                                                                 FontSize="10" Margin="0,0,0,4"
+                                                                 ToolTip="Team label"/>
+                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                            <Button Content="✓" Click="SaveCard_Click" Tag="{Binding}"
+                                                                    Background="#1B5E20" Foreground="White"
+                                                                    Width="28" Height="20" FontSize="11"
+                                                                    BorderThickness="0" Cursor="Hand"
+                                                                    Margin="0,0,4,0">
+                                                                <Button.Template>
+                                                                    <ControlTemplate TargetType="Button">
+                                                                        <Border Background="{TemplateBinding Background}"
+                                                                                CornerRadius="4" Padding="2">
+                                                                            <ContentPresenter HorizontalAlignment="Center"
+                                                                                              VerticalAlignment="Center"/>
+                                                                        </Border>
+                                                                    </ControlTemplate>
+                                                                </Button.Template>
+                                                            </Button>
+                                                            <Button Content="✕" Click="CancelCard_Click" Tag="{Binding}"
+                                                                    Background="#7F2020" Foreground="White"
+                                                                    Width="20" Height="20" FontSize="10"
+                                                                    BorderThickness="0" Cursor="Hand">
+                                                                <Button.Template>
+                                                                    <ControlTemplate TargetType="Button">
+                                                                        <Border Background="{TemplateBinding Background}"
+                                                                                CornerRadius="4" Padding="2">
+                                                                            <ContentPresenter HorizontalAlignment="Center"
+                                                                                              VerticalAlignment="Center"/>
+                                                                        </Border>
+                                                                    </ControlTemplate>
+                                                                </Button.Template>
+                                                            </Button>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <!-- Edit button — top-right, EditMode ON -->
+                                                <Button Content="✏" FontSize="10"
+                                                        Width="20" Height="20"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                        Margin="0,2,44,0"
+                                                        Foreground="{DynamicResource BrushAccentCyan}"
+                                                        BorderThickness="0" Cursor="Hand"
+                                                        ToolTip="Edit this clock"
+                                                        Click="EditCard_Click" Tag="{Binding}">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button">
+                                                            <Setter Property="Template">
+                                                                <Setter.Value>
+                                                                    <ControlTemplate TargetType="Button">
+                                                                        <Border x:Name="Bd" Background="Transparent"
+                                                                                CornerRadius="10" Padding="2">
+                                                                            <ContentPresenter HorizontalAlignment="Center"
+                                                                                              VerticalAlignment="Center"/>
+                                                                        </Border>
+                                                                        <ControlTemplate.Triggers>
+                                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                                <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF"/>
+                                                                            </Trigger>
+                                                                        </ControlTemplate.Triggers>
+                                                                    </ControlTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <MultiDataTrigger>
+                                                                    <MultiDataTrigger.Conditions>
+                                                                        <Condition Binding="{Binding Source={x:Static local:EditModeProxy.Instance}, Path=EditMode}" Value="True"/>
+                                                                        <Condition Binding="{Binding IsEditing}" Value="False"/>
+                                                                    </MultiDataTrigger.Conditions>
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </MultiDataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+
+                                                <!-- Home button — top-right, EditMode ON -->
+                                                <Button Content="🏠" FontSize="10"
+                                                        Width="20" Height="20"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                        Margin="0,2,22,0"
+                                                        BorderThickness="0" Cursor="Hand"
+                                                        ToolTip="Set as home location"
+                                                        Click="SetHomeLocation_Click" Tag="{Binding}">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button">
+                                                            <Setter Property="Template">
+                                                                <Setter.Value>
+                                                                    <ControlTemplate TargetType="Button">
+                                                                        <Border x:Name="Bd" Background="Transparent"
+                                                                                CornerRadius="10" Padding="2">
+                                                                            <ContentPresenter HorizontalAlignment="Center"
+                                                                                              VerticalAlignment="Center"/>
+                                                                        </Border>
+                                                                        <ControlTemplate.Triggers>
+                                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                                <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF"/>
+                                                                            </Trigger>
+                                                                        </ControlTemplate.Triggers>
+                                                                    </ControlTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <MultiDataTrigger>
+                                                                    <MultiDataTrigger.Conditions>
+                                                                        <Condition Binding="{Binding Source={x:Static local:EditModeProxy.Instance}, Path=EditMode}" Value="True"/>
+                                                                        <Condition Binding="{Binding IsEditing}" Value="False"/>
+                                                                        <Condition Binding="{Binding IsUtc}" Value="False"/>
+                                                                    </MultiDataTrigger.Conditions>
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </MultiDataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+
+                                                <!-- Delete button — top-right, DeleteMode ON -->
+                                                <Button Content="✕" FontSize="11"
+                                                        Width="20" Height="20"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                        Margin="0,2,2,0"
+                                                        Background="#C62828" Foreground="White"
+                                                        BorderThickness="0" Cursor="Hand"
+                                                        AutomationProperties.Name="DeleteCityButton"
+                                                        Tag="{Binding}" Click="DeleteCard_Click">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button">
+                                                            <Setter Property="Template">
+                                                                <Setter.Value>
+                                                                    <ControlTemplate TargetType="Button">
+                                                                        <Border Background="{TemplateBinding Background}"
+                                                                                CornerRadius="10" Padding="2">
+                                                                            <ContentPresenter HorizontalAlignment="Center"
+                                                                                              VerticalAlignment="Center"/>
+                                                                        </Border>
+                                                                    </ControlTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Source={x:Static local:DeleteModeProxy.Instance}, Path=DeleteMode}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Viewbox>
+                    </DockPanel>
+                </Border>
+
+                <!-- ══════════════════════════════════════════════════════
+                     RIGHT PANEL — Time Visualizer
+                     Search ("Add city") is now at the TOP of the expanded
+                     panel, immediately below the toggle bar.
+                     Date navigation is integrated into the control strip.
+                     The timeline grid is the dominant, wider surface.
+                     ══════════════════════════════════════════════════════ -->
+                <Border x:Name="VisualizerPanelBorder" Grid.Column="1"
+                        Background="{DynamicResource BrushBackgroundMid}"
+                        CornerRadius="0,10,10,0" Margin="2,0,0,0">
+                    <StackPanel>
+                        <!-- Toggle bar -->
+                        <Button Background="Transparent" BorderThickness="0"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch"
+                                Padding="16,10" Cursor="Hand"
+                                AutomationProperties.Name="ToggleTranslatorButton"
+                                Click="ToggleTranslator_Click">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="🕐" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <TextBlock.Effect>
+                                            <DropShadowEffect Color="White" BlurRadius="24" ShadowDepth="0"
+                                                              Opacity="{DynamicResource GlowOpacitySubtle}"/>
+                                        </TextBlock.Effect>
+                                    </TextBlock>
+                                    <TextBlock Text="TIME VISUALIZER"
+                                               FontFamily="Consolas" FontSize="12" FontWeight="Bold"
+                                               Foreground="{DynamicResource BrushAccentCyan}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <Rectangle Grid.Column="1" Height="1" Margin="16,0"
+                                           Fill="{DynamicResource BrushSeparator}" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Translator.SelectionWindowLabel}"
+                                               FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                                               Foreground="{DynamicResource BrushAccentCyan}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Translator.IsOpen}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                                               Foreground="{DynamicResource BrushTextDim}" VerticalAlignment="Center"
+                                               Margin="8,0,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="▶ pick a date &amp; time"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Translator.IsOpen}" Value="True">
+                                                        <Setter Property="Text" Value="▼ collapse"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <StackPanel Visibility="{Binding Translator.IsOpen, Converter={StaticResource BoolToVis}}">
+                            <Border Height="1" Margin="16,0" Background="{DynamicResource BrushSeparator}"/>
+
+                            <!-- ① ADD-CITY SEARCH — prominent, at the top of the expanded panel -->
+                            <Border x:Name="GlobalCitySearchBar" Margin="12,10,12,0" CornerRadius="8"
+                                    Background="{DynamicResource BrushBackgroundCard}">
+                                <Grid Margin="12,9">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="🔍" FontSize="14"
+                                               VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.6"/>
+                                    <Grid Grid.Column="1">
+                                        <TextBox x:Name="GlobalCitySearchBox"
+                                                 Background="Transparent" BorderThickness="0"
+                                                 Foreground="{DynamicResource BrushTextPrimary}"
+                                                 FontSize="13" CaretBrush="{DynamicResource BrushAccentCyan}"
+                                                 VerticalContentAlignment="Center"
+                                                 ToolTip="Type a city or country to add it to the timeline"
+                                                 AutomationProperties.Name="AddCitySearch"
+                                                 GotFocus="GlobalCitySearch_GotFocus"
+                                                 TextChanged="GlobalCitySearch_TextChanged"
+                                                 PreviewKeyDown="GlobalCitySearch_KeyDown"
+                                                 LostFocus="GlobalCitySearch_LostFocus"/>
+                                        <TextBlock x:Name="GlobalCitySearchPlaceholder"
+                                                   Text="Add a city to the timeline…"
+                                                   IsHitTestVisible="False" VerticalAlignment="Center"
+                                                   Opacity="0.4" FontSize="13"
+                                                   Foreground="{DynamicResource BrushTextPrimary}"/>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+
+                            <!-- Add-city search results -->
+                            <Border x:Name="GlobalSearchDropdown"
+                                    Visibility="Collapsed"
+                                    Background="{DynamicResource BrushBackgroundMid}"
+                                    BorderBrush="{DynamicResource BrushAccentCyan}"
+                                    BorderThickness="1" CornerRadius="0,0,8,8"
+                                    Margin="12,0,12,0">
+                                <ListBox x:Name="GlobalCitySearchList"
+                                         AutomationProperties.Name="GlobalCitySearchList"
+                                         MaxHeight="220"
+                                         Background="{DynamicResource BrushBackgroundMid}"
+                                         BorderThickness="0"
+                                         KeyboardNavigation.DirectionalNavigation="None"
+                                         VirtualizingPanel.IsVirtualizing="False"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         PreviewKeyDown="GlobalCitySearchList_PreviewKeyDown"
+                                         MouseLeftButtonUp="GlobalCitySearchList_MouseSelect">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Padding"    Value="12,7"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+                                            <Setter Property="Background" Value="{DynamicResource BrushBackgroundMid}"/>
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <!-- Static default — no TemplateBinding so triggers are never blocked -->
+                                                        <Border x:Name="Bd"
+                                                                Background="{DynamicResource BrushBackgroundMid}"
+                                                                Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter/>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BrushBackgroundCard}"/>
+                                                            </Trigger>
+                                                            <Trigger Property="IsSelected" Value="True">
+                                                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BrushAccentCyan}"/>
+                                                            </Trigger>
+                                                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BrushAccentCyan}"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
                                         </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock FontFamily="Consolas" FontSize="11" FontWeight="Bold"
-                                           Foreground="{DynamicResource BrushTextDim}" VerticalAlignment="Center"
-                                           Margin="8,0,0,0">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Text" Value="▶ pick a date &amp; time"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Translator.IsOpen}" Value="True">
-                                                    <Setter Property="Text" Value="▼ collapse"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </StackPanel>
-                        </Grid>
-                    </Button>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding CountryFlag}" FontSize="16"
+                                                           VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding City}" FontSize="12"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource BrushTextPrimary}"/>
+                                                        <TextBlock Text="{Binding PrimaryCode}"
+                                                                   FontSize="10" FontFamily="Consolas"
+                                                                   Foreground="{DynamicResource BrushTextDim}"
+                                                                   VerticalAlignment="Center"
+                                                                   Margin="6,0,0,0">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Style.Triggers>
+                                                                        <Trigger Property="Text" Value="">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        </Trigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Country}" FontSize="10"
+                                                               Foreground="{DynamicResource BrushTextDim}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
 
-                    <StackPanel Visibility="{Binding Translator.IsOpen, Converter={StaticResource BoolToVis}}">
-                        <Border Height="1" Margin="16,0" Background="{DynamicResource BrushSeparator}"/>
-
-                        <!-- Control row: date navigation + source city search -->
-                        <Grid Margin="12,8,12,6">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Date navigation -->
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- ② DATE NAVIGATION — FROM city is now selected via the search bar above -->
+                            <StackPanel Orientation="Horizontal" Margin="12,8,12,0">
                                 <Button Content="◀" Width="22" Height="22"
                                         Background="Transparent" BorderThickness="0"
                                         Foreground="{DynamicResource BrushTextPrimary}"
@@ -409,777 +991,436 @@
                                         </ControlTemplate>
                                     </Button.Template>
                                 </Button>
-                            </StackPanel>
-
-                            <!-- Source city searchable selector -->
-                            <Border Grid.Column="1" Background="{DynamicResource BrushBackgroundCard}"
-                                    CornerRadius="6" Margin="12,0,0,0" Padding="10,5">
-                                <DockPanel>
-                                    <TextBlock Text="FROM" DockPanel.Dock="Left"
-                                               FontFamily="Consolas" FontSize="9" FontWeight="Bold"
-                                               Foreground="{DynamicResource BrushTextDim}"
-                                               VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <Grid>
-                                        <TextBox x:Name="SourceCityBox"
-                                                 Text="{Binding Translator.SourceCitySearchText, UpdateSourceTrigger=PropertyChanged}"
-                                                 Background="Transparent" BorderThickness="0"
-                                                 Foreground="{DynamicResource BrushTextPrimary}"
-                                                 FontSize="12" CaretBrush="{DynamicResource BrushAccentCyan}"
-                                                 VerticalContentAlignment="Center"
-                                                 ToolTip="Type a city or country name to search"
-                                                 AutomationProperties.Name="SourceCitySearch"
-                                                 GotFocus="SourceCityBox_GotFocus"
-                                                 TextChanged="SourceCityBox_TextChanged"
-                                                 LostFocus="SourceCityBox_LostFocus"/>
-                                        <TextBlock x:Name="SourceCityPlaceholder"
-                                                   Text="Type a city, code or country…"
-                                                   IsHitTestVisible="False"
-                                                   VerticalAlignment="Center"
-                                                   Opacity="0.4" FontSize="12"
-                                                   Foreground="{DynamicResource BrushTextPrimary}"/>
-                                        <Popup x:Name="SourceCityPopup"
-                                               PlacementTarget="{x:Reference SourceCityBox}"
-                                               Placement="Bottom"
-                                               AllowsTransparency="True"
-                                               StaysOpen="True">
-                                            <Border Background="{DynamicResource BrushBackgroundMid}"
-                                                    BorderBrush="{DynamicResource BrushSeparator}"
-                                                    BorderThickness="1" CornerRadius="0,0,6,6"
-                                                    MinWidth="260">
-                                                <Border.Effect>
-                                                    <DropShadowEffect Color="#000000" BlurRadius="12"
-                                                                      ShadowDepth="4" Opacity="0.8"/>
-                                                </Border.Effect>
-                                                <ListBox x:Name="SourceCityList"
-                                                         ItemsSource="{Binding Translator.SourceCityMatches}"
-                                                         MaxHeight="180"
-                                                         Background="Transparent" BorderThickness="0"
-                                                         SelectionChanged="SourceCityList_SelectionChanged">
-                                                    <ListBox.ItemContainerStyle>
-                                                        <Style TargetType="ListBoxItem">
-                                                            <Setter Property="Padding"    Value="10,6"/>
-                                                            <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
-                                                            <Setter Property="Background" Value="Transparent"/>
-                                                            <Setter Property="Template">
-                                                                <Setter.Value>
-                                                                    <ControlTemplate TargetType="ListBoxItem">
-                                                                        <Border x:Name="Bd"
-                                                                                Background="{TemplateBinding Background}"
-                                                                                Padding="{TemplateBinding Padding}">
-                                                                            <ContentPresenter/>
-                                                                        </Border>
-                                                                        <ControlTemplate.Triggers>
-                                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                                <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF"/>
-                                                                            </Trigger>
-                                                                        </ControlTemplate.Triggers>
-                                                                    </ControlTemplate>
-                                                                </Setter.Value>
-                                                            </Setter>
-                                                        </Style>
-                                                    </ListBox.ItemContainerStyle>
-                                                    <ListBox.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*"/>
-                                                                    <ColumnDefinition Width="Auto"/>
-                                                                </Grid.ColumnDefinitions>
-                                                                <!-- City info (selects as source) -->
-                                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                                                    <TextBlock Text="{Binding CountryFlag}" FontSize="14"
-                                                                               VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                                    <TextBlock Text="{Binding City}" FontSize="12"
-                                                                               FontWeight="SemiBold"
-                                                                               Foreground="{DynamicResource BrushTextPrimary}"
-                                                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                                                    <TextBlock Text="{Binding Country}" FontSize="10"
-                                                                               Foreground="{DynamicResource BrushTextDim}"
-                                                                               VerticalAlignment="Center"/>
-                                                                </StackPanel>
-                                                                <!-- Add-to-clocks button -->
-                                                                <Button Grid.Column="1"
-                                                                        Content="+" FontSize="14" FontWeight="Bold"
-                                                                        Width="24" Height="24"
-                                                                        Margin="8,0,2,0"
-                                                                        Background="Transparent"
-                                                                        Foreground="{DynamicResource BrushAccentCyan}"
-                                                                        BorderThickness="0" Cursor="Hand"
-                                                                        ToolTip="Add to clocks"
-                                                                        Tag="{Binding}"
-                                                                        Click="AddCityFromTranslator_Click">
-                                                                    <Button.Template>
-                                                                        <ControlTemplate TargetType="Button">
-                                                                            <Border x:Name="Bd" Background="Transparent"
-                                                                                    CornerRadius="4" Padding="2">
-                                                                                <ContentPresenter HorizontalAlignment="Center"
-                                                                                                  VerticalAlignment="Center"/>
-                                                                            </Border>
-                                                                            <ControlTemplate.Triggers>
-                                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                                    <Setter TargetName="Bd" Property="Background" Value="#3300E5FF"/>
-                                                                                </Trigger>
-                                                                            </ControlTemplate.Triggers>
-                                                                        </ControlTemplate>
-                                                                    </Button.Template>
-                                                                </Button>
-                                                            </Grid>
-                                                        </DataTemplate>
-                                                    </ListBox.ItemTemplate>
-                                                </ListBox>
-                                            </Border>
-                                        </Popup>
-                                    </Grid>
-                                </DockPanel>
-                            </Border>
-                        </Grid>
-
-                        <!-- WTB-style transposed grid: rows = cities, columns = half-hour slots -->
-                        <Border Background="{DynamicResource BrushBackgroundDark}"
-                                Margin="8,0,8,4" CornerRadius="8" ClipToBounds="True"
-                                PreviewMouseLeftButtonDown="GridArea_PreviewMouseDown"
-                                PreviewMouseMove="GridArea_PreviewMouseMove"
-                                PreviewMouseLeftButtonUp="GridArea_PreviewMouseUp">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="22"/>
-                                    <RowDefinition Height="Auto" MaxHeight="220"/>
-                                </Grid.RowDefinitions>
-
-                                <!-- Pinned column-header row: hour labels over 20px-wide slot columns -->
-                                <Border Grid.Row="0"
-                                        Background="{DynamicResource BrushBackgroundMid}"
-                                        BorderBrush="{DynamicResource BrushSeparator}"
-                                        BorderThickness="0,0,0,1">
+                                <!-- FROM indicator — shows selected source city -->
+                                <Border Background="{DynamicResource BrushBackgroundCard}"
+                                        CornerRadius="6" Margin="12,0,0,0" Padding="8,3">
                                     <StackPanel Orientation="Horizontal">
-                                        <!-- 90px spacer matches row-header width below -->
-                                        <Border Width="90"
-                                                Background="{DynamicResource BrushBackgroundMid}"/>
-                                        <!-- 48 slot headers at 20px each -->
-                                        <ItemsControl ItemsSource="{Binding Translator.Columns}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Width="20" Height="22"
-                                                            Cursor="Hand">
-                                                        <Border.Style>
-                                                            <Style TargetType="Border">
-                                                                <Setter Property="Background" Value="Transparent"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                                        <Setter Property="Background" Value="#2000E5FF"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </Border.Style>
-                                                        <!-- Label only on :00 slots -->
-                                                        <TextBlock Text="{Binding SlotLabel}"
-                                                                   FontFamily="Consolas" FontSize="8"
-                                                                   Foreground="{DynamicResource BrushTextDim}"
-                                                                   HorizontalAlignment="Left"
-                                                                   VerticalAlignment="Center"
-                                                                   Margin="2,0,0,0"/>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
+                                        <TextBlock Text="FROM " FontFamily="Consolas" FontSize="9"
+                                                   FontWeight="Bold" Foreground="{DynamicResource BrushTextDim}"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Translator.SelectedSourceCity.CountryFlag, TargetNullValue=''}"
+                                                   FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding Translator.SelectedSourceCity.City, TargetNullValue='—'}"
+                                                   FontFamily="Consolas" FontSize="9"
+                                                   Foreground="{DynamicResource BrushAccentCyan}"
+                                                   VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
+                            </StackPanel>
 
-                                <!-- Scrollable city rows -->
-                                <ScrollViewer Grid.Row="1"
-                                              x:Name="GridScrollViewer"
-                                              VerticalScrollBarVisibility="Auto"
-                                              HorizontalScrollBarVisibility="Disabled">
-                                    <ItemsControl ItemsSource="{Binding Translator.Rows}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <!-- Each row: frozen 90px header + 48 × 20px cells -->
-                                                <StackPanel Orientation="Horizontal" Height="46">
-                                                    <!-- Row header: flag, city, UTC offset, date label -->
-                                                    <Border Width="90" Padding="5,3"
-                                                            Background="{DynamicResource BrushBackgroundMid}"
-                                                            BorderBrush="{DynamicResource BrushSeparator}"
-                                                            BorderThickness="0,0,1,1">
-                                                        <StackPanel VerticalAlignment="Center">
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <TextBlock Text="{Binding CountryFlag}"
-                                                                           FontSize="11"
-                                                                           VerticalAlignment="Center"
-                                                                           Margin="0,0,3,0"/>
-                                                                <TextBlock Text="{Binding CityName}"
-                                                                           FontSize="9" FontWeight="Bold"
-                                                                           Foreground="{DynamicResource BrushTextPrimary}"
-                                                                           TextTrimming="CharacterEllipsis"
-                                                                           MaxWidth="64"
-                                                                           VerticalAlignment="Center"/>
-                                                            </StackPanel>
-                                                            <TextBlock Text="{Binding UtcOffset}"
-                                                                       FontFamily="Consolas" FontSize="7"
-                                                                       Foreground="{Binding AccentBrush}"/>
-                                                            <!-- Date label: orange = +1 day, slate-blue = -1 day, dim = same -->
-                                                            <TextBlock Text="{Binding DateLabel}"
-                                                                       FontFamily="Consolas" FontSize="7">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Foreground"
-                                                                                Value="{DynamicResource BrushTextDim}"/>
+                            <!-- ③ TIMELINE: row headers are inline result cards, one per timezone row -->
+                            <Border Margin="8,4,8,4"
+                                    Background="{DynamicResource BrushBackgroundDark}"
+                                    CornerRadius="8" ClipToBounds="True"
+                                    AutomationProperties.Name="TranslatorResults"
+                                    PreviewMouseLeftButtonDown="GridArea_PreviewMouseDown"
+                                    PreviewMouseMove="GridArea_PreviewMouseMove"
+                                    PreviewMouseLeftButtonUp="GridArea_PreviewMouseUp">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="22"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Column-header row: 160px spacer + hour labels -->
+                                    <Border Grid.Row="0"
+                                            Background="{DynamicResource BrushBackgroundMid}"
+                                            BorderBrush="{DynamicResource BrushSeparator}"
+                                            BorderThickness="0,0,0,1">
+                                        <Grid>
+                                            <!-- Layer 1: selection boxes (20px per slot) -->
+                                            <StackPanel Orientation="Horizontal">
+                                                <Border Width="160" Background="{DynamicResource BrushBackgroundMid}"/>
+                                                <ItemsControl ItemsSource="{Binding Translator.Columns}">
+                                                    <ItemsControl.ItemContainerStyle>
+                                                        <Style TargetType="ContentPresenter">
+                                                            <Setter Property="Canvas.Left" Value="{Binding SlotIndex, Converter={StaticResource SlotToPx}}"/>
+                                                            <Setter Property="Canvas.Top"  Value="0"/>
+                                                        </Style>
+                                                    </ItemsControl.ItemContainerStyle>
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <Canvas Width="672" Height="22"/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Width="14" Height="22" Cursor="Hand">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border">
+                                                                        <Setter Property="Background" Value="Transparent"/>
                                                                         <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding DateDayDiff}" Value="1">
-                                                                                <Setter Property="Foreground" Value="#FF8C00"/>
-                                                                            </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding DateDayDiff}" Value="-1">
-                                                                                <Setter Property="Foreground" Value="#6A5ACD"/>
+                                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                                <Setter Property="Background" Value="#2000E5FF"/>
                                                                             </DataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
+                                                                </Border.Style>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                            <!-- Layer 2: hour labels (40px per pair, on top via Grid Z-order, hit-test transparent) -->
+                                            <ItemsControl ItemsSource="{Binding Translator.Columns}" Margin="160,0,0,0"
+                                                          IsHitTestVisible="False">
+                                                <ItemsControl.ItemContainerStyle>
+                                                    <Style TargetType="ContentPresenter">
+                                                        <Setter Property="Canvas.Left" Value="{Binding SlotIndex, Converter={StaticResource SlotToPx}}"/>
+                                                        <Setter Property="Canvas.Top"  Value="0"/>
+                                                    </Style>
+                                                </ItemsControl.ItemContainerStyle>
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <Canvas Width="672" Height="22"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <!-- Width=28 forces Canvas to arrange this ContentPresenter at 28px,
+                                                             spanning both the hour cell and the :30 cell of the pair.
+                                                             Collapsed for :30 slots (DesiredSize=0, no rendering). -->
+                                                        <Border Width="28" Height="22" Background="Transparent">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsHourStart}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <Grid VerticalAlignment="Center">
+                                                                <!-- Midnight slot: show weekday + date -->
+                                                                <StackPanel>
+                                                                    <StackPanel.Style>
+                                                                        <Style TargetType="StackPanel">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsMidnight}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </StackPanel.Style>
+                                                                    <TextBlock Text="{Binding DayOfWeekLabel}"
+                                                                               FontFamily="Consolas" FontSize="8" FontWeight="Bold"
+                                                                               Foreground="{DynamicResource BrushAccentCyan}"
+                                                                               HorizontalAlignment="Center"
+                                                                               LineHeight="9"/>
+                                                                    <TextBlock Text="{Binding DateShortLabel}"
+                                                                               FontFamily="Consolas" FontSize="7"
+                                                                               Foreground="{DynamicResource BrushTextDim}"
+                                                                               HorizontalAlignment="Center"
+                                                                               LineHeight="8"/>
+                                                                </StackPanel>
+                                                                <!-- All other hour slots: show hour + am/pm -->
+                                                                <StackPanel>
+                                                                    <StackPanel.Style>
+                                                                        <Style TargetType="StackPanel">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsMidnight}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </StackPanel.Style>
+                                                                    <TextBlock Text="{Binding SlotHour}"
+                                                                               FontFamily="Consolas" FontSize="9"
+                                                                               Foreground="{DynamicResource BrushTextDim}"
+                                                                               HorizontalAlignment="Center"
+                                                                               LineHeight="10"/>
+                                                                    <TextBlock Text="{Binding SlotAmPm}"
+                                                                               FontFamily="Consolas" FontSize="7"
+                                                                               Foreground="{DynamicResource BrushTextDim}"
+                                                                               HorizontalAlignment="Center"
+                                                                               LineHeight="8"/>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Scrollable city rows — each row has an inline result card on the left -->
+                                    <ScrollViewer Grid.Row="1"
+                                                  x:Name="GridScrollViewer"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl ItemsSource="{Binding Translator.Rows}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Height="34">
+                                                        <!-- Layer 1: band backgrounds, selection overlay, day-change bar -->
+                                                        <StackPanel Orientation="Horizontal">
+
+                                                        <!-- ▌ Row header card (160px, 2-line compact layout) -->
+                                                        <Border Width="160" Height="34"
+                                                                Background="{DynamicResource BrushBackgroundMid}"
+                                                                BorderBrush="{DynamicResource BrushSeparator}"
+                                                                BorderThickness="0,0,1,1"
+                                                                ClipToBounds="True">
+                                                            <Grid>
+                                                                <!-- Left accent bar -->
+                                                                <Border HorizontalAlignment="Left"
+                                                                        VerticalAlignment="Stretch"
+                                                                        Width="3"
+                                                                        Background="{Binding ThemedAccentBrush}"/>
+                                                                <!-- 3-section grid:  [city|time|weekday] -->
+                                                                <Grid Margin="3,2,2,2" VerticalAlignment="Center">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*"/>      <!-- city -->
+                                                                        <ColumnDefinition Width="Auto"/>   <!-- time range -->
+                                                                        <ColumnDefinition Width="Auto"/>   <!-- date/weekday -->
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <!-- Col 0: Flag + CityName / UTC offset + DST -->
+                                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                                        <StackPanel Orientation="Horizontal">
+                                                                            <TextBlock Text="{Binding CountryFlag}"
+                                                                                       FontSize="9" VerticalAlignment="Center"
+                                                                                       Margin="0,0,2,0"/>
+                                                                            <TextBlock Text="{Binding CityName}"
+                                                                                       FontSize="8" FontWeight="Bold"
+                                                                                       Foreground="{DynamicResource BrushTextPrimary}"
+                                                                                       TextTrimming="CharacterEllipsis"
+                                                                                       MaxWidth="106" VerticalAlignment="Center"/>
+                                                                        </StackPanel>
+                                                                        <TextBlock Text="{Binding UtcOffset}"
+                                                                                   FontFamily="Consolas" FontSize="7"
+                                                                                   Foreground="{Binding ThemedAccentBrush}"/>
+                                                                    </StackPanel>
+                                                                    <!-- Col 1: Time range (visible after selection) -->
+                                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                                                                Margin="4,0,4,0">
+                                                                        <StackPanel.Style>
+                                                                            <Style TargetType="StackPanel">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding ShowTranslatedTime}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </StackPanel.Style>
+                                                                        <!-- Start → End time -->
+                                                                        <StackPanel Orientation="Horizontal">
+                                                                            <TextBlock Text="{Binding SelectedTimeStr}"
+                                                                                       FontFamily="Consolas" FontSize="9" FontWeight="Bold"
+                                                                                       Foreground="{Binding ThemedAccentBrush}">
+                                                                                <TextBlock.Effect>
+                                                                                    <DropShadowEffect BlurRadius="6" ShadowDepth="0"
+                                                                                                      Opacity="{DynamicResource GlowOpacity}"
+                                                                                                      Color="#00BFFF"/>
+                                                                                </TextBlock.Effect>
+                                                                            </TextBlock>
+                                                                            <!-- Arrow + end time (range only) -->
+                                                                            <StackPanel Orientation="Horizontal">
+                                                                                <StackPanel.Style>
+                                                                                    <Style TargetType="StackPanel">
+                                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding HasRange}" Value="True">
+                                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </StackPanel.Style>
+                                                                                <TextBlock Text="→" FontFamily="Consolas" FontSize="7"
+                                                                                           Foreground="{DynamicResource BrushTextDim}"
+                                                                                           VerticalAlignment="Center" Margin="2,0"/>
+                                                                                <TextBlock Text="{Binding SelectedEndTimeStr}"
+                                                                                           FontFamily="Consolas" FontSize="9" FontWeight="Bold"
+                                                                                           Foreground="{Binding ThemedAccentBrush}">
+                                                                                    <TextBlock.Effect>
+                                                                                        <DropShadowEffect BlurRadius="6" ShadowDepth="0"
+                                                                                                          Opacity="{DynamicResource GlowOpacity}"
+                                                                                                          Color="#00BFFF"/>
+                                                                                    </TextBlock.Effect>
+                                                                                </TextBlock>
+                                                                            </StackPanel>
+                                                                        </StackPanel>
+                                                                        <!-- Day diff indicator -->
+                                                                        <TextBlock FontFamily="Consolas" FontSize="8"
+                                                                                   Foreground="{DynamicResource BrushTextDim}">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Text" Value=""/>
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding DateDayDiff}" Value="1">
+                                                                                            <Setter Property="Text" Value="+1 day"/>
+                                                                                            <Setter Property="Foreground" Value="#FF8C00"/>
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
+                                                                    </StackPanel>
+                                                                    <!-- Col 2: Weekday / Date (visible after selection) -->
+                                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                                        <StackPanel.Style>
+                                                                            <Style TargetType="StackPanel">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding ShowTranslatedTime}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </StackPanel.Style>
+                                                                        <!-- e.g. "Wed" -->
+                                                                        <TextBlock FontFamily="Consolas" FontSize="8" FontWeight="Bold"
+                                                                                   Foreground="{DynamicResource BrushTextPrimary}">
+                                                                            <TextBlock.Text>
+                                                                                <Binding Path="DateLabel"
+                                                                                         StringFormat="{}{0:ddd}"
+                                                                                         ConverterCulture="en-US"/>
+                                                                            </TextBlock.Text>
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Text" Value="{Binding DateLabel}"/>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
+                                                                        <!-- DST badge -->
+                                                                        <Border CornerRadius="2" Padding="2,0"
+                                                                                Background="{DynamicResource BrushBackgroundDark}">
+                                                                            <TextBlock Text="{Binding DstLabel}"
+                                                                                       FontFamily="Consolas" FontSize="6"
+                                                                                       FontWeight="Bold">
+                                                                                <TextBlock.Style>
+                                                                                    <Style TargetType="TextBlock">
+                                                                                        <Setter Property="Foreground" Value="{DynamicResource BrushTextDim}"/>
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding IsDst}" Value="True">
+                                                                                                <Setter Property="Foreground" Value="{DynamicResource BrushDstActive}"/>
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </TextBlock.Style>
+                                                                            </TextBlock>
+                                                                        </Border>
+                                                                    </StackPanel>
+                                                                </Grid>
+                                                            </Grid>
+                                                        </Border>
+
+                                                        <!-- Timezone cells (48 half-hour slots) — background + selection only, NO label -->
+                                                        <ItemsControl ItemsSource="{Binding Cells}">
+                                                            <ItemsControl.ItemContainerStyle>
+                                                                <Style TargetType="ContentPresenter">
+                                                                    <Setter Property="Canvas.Left" Value="{Binding SlotIndex, Converter={StaticResource SlotToPx}}"/>
+                                                                    <Setter Property="Canvas.Top"  Value="0"/>
+                                                                </Style>
+                                                            </ItemsControl.ItemContainerStyle>
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <Canvas Width="672" Height="34"/>
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border Width="14" Height="34"
+                                                                            Background="{Binding Background}"
+                                                                            BorderBrush="{DynamicResource BrushSeparator}"
+                                                                            BorderThickness="0,0,0,1">
+                                                                        <Grid>
+                                                                            <!-- Selection overlay -->
+                                                                            <Border>
+                                                                                <Border.Style>
+                                                                                    <Style TargetType="Border">
+                                                                                        <Setter Property="Background" Value="Transparent"/>
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                                                <Setter Property="Background" Value="#6000E5FF"/>
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </Border.Style>
+                                                                            </Border>
+                                                                            <!-- Day-change indicator bar at top -->
+                                                                            <Border VerticalAlignment="Top" Height="2">
+                                                                                <Border.Style>
+                                                                                    <Style TargetType="Border">
+                                                                                        <Setter Property="Background" Value="Transparent"/>
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding DayDiff}" Value="+1">
+                                                                                                <Setter Property="Background" Value="#80FF8C00"/>
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </Border.Style>
+                                                                            </Border>
+                                                                        </Grid>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
                                                         </StackPanel>
-                                                    </Border>
-                                                    <!-- 48 half-hour cells -->
-                                                    <ItemsControl ItemsSource="{Binding Cells}">
-                                                        <ItemsControl.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <StackPanel Orientation="Horizontal"/>
-                                                            </ItemsPanelTemplate>
-                                                        </ItemsControl.ItemsPanel>
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <Border Width="20" Height="46"
-                                                                        Background="{Binding Background}"
-                                                                        BorderBrush="{DynamicResource BrushSeparator}"
-                                                                        BorderThickness="0,0,0,1">
-                                                                    <!-- Selection + day-diff overlay -->
-                                                                    <Border>
+
+                                                        <!-- Layer 2: hour labels (40px per pair, on top via Grid Z-order, hit-test transparent) -->
+                                                        <ItemsControl ItemsSource="{Binding Cells}" Margin="160,0,0,0"
+                                                                      IsHitTestVisible="False">
+                                                            <ItemsControl.ItemContainerStyle>
+                                                                <Style TargetType="ContentPresenter">
+                                                                    <Setter Property="Canvas.Left" Value="{Binding SlotIndex, Converter={StaticResource SlotToPx}}"/>
+                                                                    <Setter Property="Canvas.Top"  Value="0"/>
+                                                                </Style>
+                                                            </ItemsControl.ItemContainerStyle>
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <Canvas Width="672" Height="34"/>
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <!-- Width=28 forces Canvas to arrange this ContentPresenter at 28px,
+                                                                         spanning both the hour cell and the :30 cell of the pair.
+                                                                         Collapsed for :30 slots (DesiredSize=0, no rendering). -->
+                                                                    <Border Width="28" Height="34" Background="Transparent">
                                                                         <Border.Style>
                                                                             <Style TargetType="Border">
-                                                                                <Setter Property="Background" Value="Transparent"/>
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
                                                                                 <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                                                        <Setter Property="Background" Value="#6000E5FF"/>
+                                                                                    <DataTrigger Binding="{Binding IsHourSlot}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible"/>
                                                                                     </DataTrigger>
                                                                                 </Style.Triggers>
                                                                             </Style>
                                                                         </Border.Style>
-                                                                        <!-- Thin top stripe: orange = next day, slate = prev day -->
-                                                                        <Border VerticalAlignment="Top" Height="3">
-                                                                            <Border.Style>
-                                                                                <Style TargetType="Border">
-                                                                                    <Setter Property="Background" Value="Transparent"/>
-                                                                                    <Style.Triggers>
-                                                                                        <DataTrigger Binding="{Binding DayDiff}" Value="+1">
-                                                                                            <Setter Property="Background" Value="#80FF8C00"/>
-                                                                                        </DataTrigger>
-                                                                                        <DataTrigger Binding="{Binding DayDiff}" Value="-1">
-                                                                                            <Setter Property="Background" Value="#806A5ACD"/>
-                                                                                        </DataTrigger>
-                                                                                    </Style.Triggers>
-                                                                                </Style>
-                                                                            </Border.Style>
-                                                                        </Border>
+                                                                        <StackPanel VerticalAlignment="Center">
+                                                                            <TextBlock Text="{Binding TimeHourPart}"
+                                                                                       FontFamily="Consolas" FontSize="9"
+                                                                                       Foreground="{Binding Foreground}"
+                                                                                       HorizontalAlignment="Center"
+                                                                                       LineHeight="10"/>
+                                                                            <TextBlock Text="{Binding TimeAmPmPart}"
+                                                                                       FontFamily="Consolas" FontSize="7"
+                                                                                       Foreground="{Binding Foreground}"
+                                                                                       HorizontalAlignment="Center"
+                                                                                       LineHeight="8"/>
+                                                                        </StackPanel>
                                                                     </Border>
-                                                                </Border>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
-                            </Grid>
-                        </Border>
-
-                        <!-- Selected-hour result cards -->
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                      VerticalScrollBarVisibility="Disabled"
-                                      Margin="8,0,8,10"
-                                      AutomationProperties.Name="TranslatorResults">
-                            <ItemsControl ItemsSource="{Binding Translator.Results}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Style="{StaticResource CardBorder}" Width="160" Padding="14,12">
-                                            <Grid>
-                                                <Border HorizontalAlignment="Left" VerticalAlignment="Stretch"
-                                                        Width="3" CornerRadius="3"
-                                                        Margin="-14,-12,0,-12"
-                                                        Background="{Binding AccentBrush}"/>
-                                                <StackPanel Margin="6,0,0,0">
-                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                                        <TextBlock Text="{Binding CountryFlag}" FontSize="16"
-                                                                   VerticalAlignment="Center" Margin="0,0,6,0">
-                                                            <TextBlock.Effect>
-                                                                <DropShadowEffect Color="White" BlurRadius="24"
-                                                                                  ShadowDepth="0"
-                                                                                  Opacity="{DynamicResource GlowOpacitySubtle}"/>
-                                                            </TextBlock.Effect>
-                                                        </TextBlock>
-                                                        <TextBlock Text="{Binding CityName}"
-                                                                   FontSize="11" FontWeight="SemiBold"
-                                                                   Foreground="{DynamicResource BrushTextPrimary}"
-                                                                   VerticalAlignment="Center"
-                                                                   TextTrimming="CharacterEllipsis" MaxWidth="90"/>
-                                                    </StackPanel>
-                                                    <!-- Start time: large when single slot, smaller when range -->
-                                                    <TextBlock Text="{Binding TimeStr}"
-                                                               FontFamily="Consolas" FontWeight="Bold"
-                                                               Foreground="{Binding AccentBrush}"
-                                                               TextAlignment="Center" Margin="0,6,0,0">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="FontSize" Value="30"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding HasRange}" Value="True">
-                                                                        <Setter Property="FontSize" Value="20"/>
-                                                                        <Setter Property="Margin"   Value="0,4,0,0"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                        <TextBlock.Effect>
-                                                            <DropShadowEffect BlurRadius="10" ShadowDepth="0"
-                                                                              Opacity="{DynamicResource GlowOpacity}" Color="#00BFFF"/>
-                                                        </TextBlock.Effect>
-                                                    </TextBlock>
-                                                    <!-- End time — only visible when a range is selected -->
-                                                    <StackPanel Orientation="Horizontal"
-                                                                HorizontalAlignment="Center"
-                                                                Visibility="{Binding HasRange, Converter={StaticResource BoolToVis}}">
-                                                        <TextBlock Text="→ " FontFamily="Consolas" FontSize="11"
-                                                                   Foreground="{DynamicResource BrushTextDim}"
-                                                                   VerticalAlignment="Center"/>
-                                                        <TextBlock Text="{Binding EndTimeStr}"
-                                                                   FontFamily="Consolas" FontSize="16" FontWeight="Bold"
-                                                                   Foreground="{Binding AccentBrush}"
-                                                                   VerticalAlignment="Center">
-                                                            <TextBlock.Effect>
-                                                                <DropShadowEffect BlurRadius="8" ShadowDepth="0"
-                                                                                  Opacity="{DynamicResource GlowOpacity}" Color="#00BFFF"/>
-                                                            </TextBlock.Effect>
-                                                        </TextBlock>
-                                                    </StackPanel>
-                                                    <TextBlock Text="{Binding DateStr}"
-                                                               FontFamily="Consolas" FontSize="9"
-                                                               Foreground="{DynamicResource BrushTextDim}"
-                                                               TextAlignment="Center"/>
-                                                    <Border Height="1" Margin="0,6"
-                                                            Background="{DynamicResource BrushSeparator}"/>
-                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                                        <Border CornerRadius="3" Padding="5,2" Margin="0,0,6,0"
-                                                                Background="{DynamicResource BrushBackgroundDark}">
-                                                            <TextBlock Text="{Binding DstLabel}"
-                                                                       FontFamily="Consolas" FontSize="9">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Foreground" Value="{DynamicResource BrushTextDim}"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsDst}" Value="True">
-                                                                                <Setter Property="Foreground" Value="{DynamicResource BrushDstActive}"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                        </Border>
-                                                        <TextBlock Text="{Binding UtcOffset}"
-                                                                   FontFamily="Consolas" FontSize="9"
-                                                                   Foreground="{Binding AccentBrush}"
-                                                                   VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-
-                        <!-- ADD-CITY SEARCH — inside the Time Translator expanded panel.
-                             Selecting a result calls AddLocation which adds a new row to
-                             both the timeline grid and the location cards below. -->
-                        <Border x:Name="GlobalCitySearchBar" Margin="8,6,8,8" CornerRadius="8"
-                                Background="{DynamicResource BrushBackgroundCard}">
-                            <Grid Margin="12,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="+" FontSize="18" FontWeight="Bold"
-                                           VerticalAlignment="Center" Margin="0,0,10,0"
-                                           Foreground="{DynamicResource BrushAccentCyan}" Opacity="0.8"/>
-                                <Grid Grid.Column="1">
-                                    <TextBox x:Name="GlobalCitySearchBox"
-                                             Background="Transparent" BorderThickness="0"
-                                             Foreground="{DynamicResource BrushTextPrimary}"
-                                             FontSize="12" CaretBrush="{DynamicResource BrushAccentCyan}"
-                                             VerticalContentAlignment="Center"
-                                             ToolTip="Type a city or country to add it to the timeline"
-                                             AutomationProperties.Name="AddCitySearch"
-                                             GotFocus="GlobalCitySearch_GotFocus"
-                                             TextChanged="GlobalCitySearch_TextChanged"
-                                             KeyDown="GlobalCitySearch_KeyDown"
-                                             LostFocus="GlobalCitySearch_LostFocus"/>
-                                    <TextBlock x:Name="GlobalCitySearchPlaceholder"
-                                               Text="Add a city to the timeline…"
-                                               IsHitTestVisible="False" VerticalAlignment="Center"
-                                               Opacity="0.4" FontSize="12"
-                                               Foreground="{DynamicResource BrushTextPrimary}"/>
-                                </Grid>
-                            </Grid>
-                        </Border>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- LOCATION CARDS -->
-            <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Margin="8,6,8,0">
-                <ItemsControl x:Name="LocationsPanel" ItemsSource="{Binding Locations}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <!-- AllowDrop + drag events enable reordering by dropping onto another card -->
-                            <Border Style="{StaticResource CardBorder}" Width="220"
-                                    AllowDrop="True"
-                                    DragOver="Card_DragOver"
-                                    DragLeave="Card_DragLeave"
-                                    Drop="Card_Drop">
-                                <Border.BorderBrush>
-                                    <SolidColorBrush Color="Transparent"/>
-                                </Border.BorderBrush>
-                                <Grid>
-                                    <!-- Accent bar -->
-                                    <Border HorizontalAlignment="Left" VerticalAlignment="Stretch"
-                                            Width="4" CornerRadius="4" Margin="-20,-16,0,-16"
-                                            Background="{Binding AccentBrush}"/>
-
-                                    <!-- ═══ NORMAL VIEW (collapsed while editing) ════════════════════ -->
-                                    <StackPanel Margin="8,0,0,0">
-                                        <StackPanel.Style>
-                                            <Style TargetType="StackPanel">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </StackPanel.Style>
-
-                                        <!-- Header row: drag handle + flag + city name -->
-                                        <Grid Margin="0,0,0,6">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>  <!-- drag handle -->
-                                                <ColumnDefinition Width="*"/>     <!-- flag + city -->
-                                            </Grid.ColumnDefinitions>
-
-                                            <!-- Drag handle (⠇) — always visible, hidden for UTC which never appears here -->
-                                            <TextBlock Grid.Column="0" Text="⠇" FontSize="15"
-                                                       Foreground="{DynamicResource BrushTextDim}"
-                                                       VerticalAlignment="Center" Margin="0,0,6,0"
-                                                       Cursor="SizeAll" ToolTip="Drag to reorder"
-                                                       PreviewMouseLeftButtonDown="DragHandle_MouseDown"/>
-
-                                            <!-- Flag + City name -->
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                                                <TextBlock Text="{Binding CountryFlag}" FontSize="22"
-                                                           VerticalAlignment="Center" Margin="0,0,8,0">
-                                                    <TextBlock.Effect>
-                                                        <DropShadowEffect Color="White" BlurRadius="24" ShadowDepth="0"
-                                                                          Opacity="{DynamicResource GlowOpacitySubtle}"/>
-                                                    </TextBlock.Effect>
-                                                </TextBlock>
-                                                <TextBlock Text="{Binding CityName}" Style="{StaticResource CityLabel}"/>
-                                            </StackPanel>
-                                        </Grid>
-
-                                        <!-- Time -->
-                                        <TextBlock Text="{Binding CurrentTime}"
-                                                   Style="{StaticResource DigitalTime}" FontSize="34"
-                                                   Foreground="{Binding AccentBrush}">
-                                            <TextBlock.Effect>
-                                                <DropShadowEffect BlurRadius="12" ShadowDepth="0"
-                                                                  Opacity="{DynamicResource GlowOpacity}" Color="#00BFFF"/>
-                                            </TextBlock.Effect>
-                                        </TextBlock>
-                                        <!-- Date -->
-                                        <TextBlock Text="{Binding CurrentDate}"
-                                                   FontFamily="Consolas" FontSize="11"
-                                                   Foreground="{DynamicResource BrushTextDim}"
-                                                   TextAlignment="Center" Margin="0,4,0,0"/>
-                                        <Border Height="1" Margin="0,8" Background="{DynamicResource BrushSeparator}"/>
-                                        <!-- DST / STD badge + team label + offset -->
-                                        <StackPanel Orientation="Horizontal"
-                                                    HorizontalAlignment="Center" Margin="0,0,0,4">
-                                            <Border CornerRadius="3" Padding="5,2" Margin="0,0,6,0"
-                                                    Background="{DynamicResource BrushBackgroundDark}">
-                                                <TextBlock Text="{Binding DstLabel}"
-                                                           FontFamily="Consolas" FontSize="9"
-                                                           FontWeight="Bold">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Foreground" Value="{DynamicResource BrushTextDim}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsDst}" Value="True">
-                                                                    <Setter Property="Foreground" Value="{DynamicResource BrushDstActive}"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </Border>
-                                            <TextBlock Text="{Binding TeamLabel}" Style="{StaticResource SubLabel}"
-                                                       FontSize="10" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                        <TextBlock Text="{Binding UtcOffset}"
-                                                   FontFamily="Consolas" FontSize="12"
-                                                   TextAlignment="Center" Foreground="{Binding AccentBrush}"/>
-                                    </StackPanel>
-
-                                    <!-- ═══ EDIT VIEW (visible while editing) ══════════════════════════ -->
-                                    <StackPanel Margin="8,0,0,0">
-                                        <StackPanel.Style>
-                                            <Style TargetType="StackPanel">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </StackPanel.Style>
-
-                                        <TextBlock Text="✏ EDIT" FontFamily="Consolas" FontSize="9" FontWeight="Bold"
-                                                   Foreground="{DynamicResource BrushAccentCyan}" Margin="0,0,0,8"/>
-
-                                        <!-- Flag + City name row -->
-                                        <Grid Margin="0,0,0,6">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="40"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBox Grid.Column="0"
-                                                     Text="{Binding EditingCountryFlag, UpdateSourceTrigger=PropertyChanged}"
-                                                     Style="{StaticResource CardEditBox}"
-                                                     FontSize="16" Padding="4"
-                                                     Margin="0,0,4,0" ToolTip="Flag emoji"/>
-                                            <TextBox Grid.Column="1"
-                                                     Text="{Binding EditingCityName, UpdateSourceTrigger=PropertyChanged}"
-                                                     Style="{StaticResource CardEditBox}"
-                                                     ToolTip="City display name"/>
-                                        </Grid>
-
-                                        <!-- Team label -->
-                                        <TextBox Text="{Binding EditingTeamLabel, UpdateSourceTrigger=PropertyChanged}"
-                                                 Style="{StaticResource CardEditBox}"
-                                                 Margin="0,0,0,8" ToolTip="Team label"/>
-
-                                        <!-- Live time (still ticking while editing) -->
-                                        <TextBlock Text="{Binding CurrentTime}"
-                                                   FontFamily="Consolas" FontSize="20" FontWeight="Bold"
-                                                   TextAlignment="Center" Margin="0,0,0,8"
-                                                   Foreground="{Binding AccentBrush}"/>
-
-                                        <!-- Save / Cancel -->
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <Button Content="✓" Click="SaveCard_Click" Tag="{Binding}"
-                                                    Background="#1B5E20" Foreground="White"
-                                                    Width="40" Height="26" FontSize="14"
-                                                    BorderThickness="0" Cursor="Hand"
-                                                    Margin="0,0,6,0" ToolTip="Save changes">
-                                                <Button.Template>
-                                                    <ControlTemplate TargetType="Button">
-                                                        <Border Background="{TemplateBinding Background}"
-                                                                CornerRadius="6" Padding="4">
-                                                            <ContentPresenter HorizontalAlignment="Center"
-                                                                              VerticalAlignment="Center"/>
-                                                        </Border>
-                                                    </ControlTemplate>
-                                                </Button.Template>
-                                            </Button>
-                                            <Button Content="✕" Click="CancelCard_Click" Tag="{Binding}"
-                                                    Background="#7F2020" Foreground="White"
-                                                    Width="26" Height="26" FontSize="12"
-                                                    BorderThickness="0" Cursor="Hand"
-                                                    ToolTip="Cancel">
-                                                <Button.Template>
-                                                    <ControlTemplate TargetType="Button">
-                                                        <Border Background="{TemplateBinding Background}"
-                                                                CornerRadius="6" Padding="4">
-                                                            <ContentPresenter HorizontalAlignment="Center"
-                                                                              VerticalAlignment="Center"/>
-                                                        </Border>
-                                                    </ControlTemplate>
-                                                </Button.Template>
-                                            </Button>
-                                        </StackPanel>
-                                    </StackPanel>
-
-                                    <!-- Edit button (✏) — top-right, visible only when EditMode is ON -->
-                                    <Button Content="✏" FontSize="12"
-                                            Width="24" Height="24"
-                                            HorizontalAlignment="Right" VerticalAlignment="Top"
-                                            Margin="0,-8,22,0"
-                                            Foreground="{DynamicResource BrushAccentCyan}"
-                                            BorderThickness="0" Cursor="Hand"
-                                            ToolTip="Edit this clock"
-                                            Click="EditCard_Click" Tag="{Binding}">
-                                        <Button.Style>
-                                            <Style TargetType="Button">
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Border x:Name="Bd" Background="Transparent"
-                                                                    CornerRadius="12" Padding="2">
-                                                                <ContentPresenter HorizontalAlignment="Center"
-                                                                                  VerticalAlignment="Center"/>
-                                                            </Border>
-                                                            <ControlTemplate.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF"/>
-                                                                </Trigger>
-                                                            </ControlTemplate.Triggers>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <!-- Show when global EditMode is ON and this card is not already editing -->
-                                                    <MultiDataTrigger>
-                                                        <MultiDataTrigger.Conditions>
-                                                            <Condition Binding="{Binding Source={x:Static local:EditModeProxy.Instance}, Path=EditMode}" Value="True"/>
-                                                            <Condition Binding="{Binding IsEditing}" Value="False"/>
-                                                        </MultiDataTrigger.Conditions>
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </MultiDataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
-
-                                    <!-- Delete button (✕) — top-right, visible only when DeleteMode is ON -->
-                                    <Button Content="✕" FontSize="14"
-                                            Width="26" Height="26"
-                                            HorizontalAlignment="Right" VerticalAlignment="Top"
-                                            Margin="0,-8,-8,0"
-                                            Background="#C62828" Foreground="White" BorderThickness="0"
-                                            Cursor="Hand"
-                                            AutomationProperties.Name="DeleteCityButton"
-                                            Tag="{Binding}" Click="DeleteCard_Click">
-                                        <Button.Style>
-                                            <Style TargetType="Button">
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Border Background="{TemplateBinding Background}"
-                                                                    CornerRadius="13" Padding="2">
-                                                                <ContentPresenter HorizontalAlignment="Center"
-                                                                                  VerticalAlignment="Center"/>
-                                                            </Border>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Source={x:Static local:DeleteModeProxy.Instance}, Path=DeleteMode}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
                                 </Grid>
                             </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
 
             <!-- FOOTER -->
-            <!-- SEARCH DROPDOWN OVERLAY
-                 Canvas spans all rows at ZIndex 100 inside the same visual tree.
-                 This avoids the AllowsTransparency + Popup HWND Z-order bug where
-                 the layered window surface renders on top of the Popup's separate HWND. -->
-            <Canvas x:Name="SearchOverlayCanvas" Grid.Row="0" Grid.RowSpan="5"
-                    Panel.ZIndex="100" IsHitTestVisible="False">
-                <Border x:Name="GlobalSearchDropdown"
-                        Visibility="Collapsed"
-                        IsHitTestVisible="True"
-                        Background="{DynamicResource BrushBackgroundMid}"
-                        BorderBrush="{DynamicResource BrushAccentCyan}"
-                        BorderThickness="1" CornerRadius="0,0,8,8"
-                        SnapsToDevicePixels="True">
-                    <Border.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="14"
-                                          ShadowDepth="4" Opacity="0.8"/>
-                    </Border.Effect>
-                    <ListBox x:Name="GlobalCitySearchList"
-                             AutomationProperties.Name="GlobalCitySearchList"
-                             MaxHeight="260"
-                             Background="{DynamicResource BrushBackgroundMid}"
-                             BorderThickness="0"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             SelectionChanged="GlobalCitySearch_ResultSelected">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Padding"    Value="12,8"/>
-                                <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
-                                <Setter Property="Background" Value="{DynamicResource BrushBackgroundMid}"/>
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="Bd"
-                                                    Background="{TemplateBinding Background}"
-                                                    Padding="{TemplateBinding Padding}">
-                                                <ContentPresenter/>
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BrushBackgroundCard}"/>
-                                                </Trigger>
-                                                <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BrushAccentCyan}"/>
-                                                </Trigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding CountryFlag}" FontSize="18"
-                                               VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding City}" FontSize="13"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource BrushTextPrimary}"/>
-                                        <TextBlock Text="{Binding Country}" FontSize="10"
-                                                   Foreground="{DynamicResource BrushTextDim}"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </Border>
-            </Canvas>
-
-            <Border Grid.Row="4" Background="{DynamicResource BrushBackgroundMid}" Padding="16,8">
+            <Border Grid.Row="3" Background="{DynamicResource BrushBackgroundMid}" Padding="16,8">
                 <TextBlock Text="© 2026 World Clock  •  All times update every second  •  Built with .NET 8 WPF"
                            FontSize="10" Foreground="{DynamicResource BrushTextDim}"
                            HorizontalAlignment="Center"/>

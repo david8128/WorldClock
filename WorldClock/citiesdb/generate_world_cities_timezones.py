@@ -1,154 +1,154 @@
+#!/usr/bin/env python3
 """
 Generate a groomed CSV of world cities with authoritative IANA timezones
 and current UTC offsets (DST-safe).
 
-DATA SOURCES
-- GeoNames allCountries.zip (https://www.geonames.org/)
-- IANA Time Zone Database via Python zoneinfo
+DATA SOURCE
+- Kaggle: samvelkoch/global-airports-iata-icao-timezone-geo
+  https://www.kaggle.com/datasets/samvelkoch/global-airports-iata-icao-timezone-geo
+
+  Requires the Kaggle CLI:
+      pip install kaggle
+  Credentials: ~/.kaggle/kaggle.json  (or KAGGLE_USERNAME / KAGGLE_KEY env vars)
+  See: https://www.kaggle.com/settings → API → Create New Token
 
 OUTPUT
-- world_cities_timezones.csv
+- world_cities_timezones.csv  (one row per unique city)
 
-GeoNames allCountries columns (0-indexed):
-  0  geonameid   1  name          2  asciiname     3  alternatenames
-  4  latitude    5  longitude     6  feature_class 7  feature_code
-  8  country_code 9 cc2          10 admin1code    11 admin2code
-  12 admin3code  13 admin4code   14 population    15 elevation
-  16 dem         17 timezone     18 modification_date
+Output columns:
+  country_code, city_name, ascii_name, alt_names,
+  latitude, longitude, iana_timezone, utc_offset_minutes, utc_offset_label
 
-LICENSE NOTE
-- GeoNames data is CC-BY 4.0 (attribution required if redistributed)
+Source columns used:
+  City_Name, Country_CodeA2, IATA, ICAO, City_IATA,
+  GeoPointLat, GeoPointLong, TimeZone
 
 Python >= 3.9 required (zoneinfo)
 """
 
 import csv
+import json
 import os
-import threading
+import subprocess
+import unicodedata
 import zipfile
-import urllib.request
 from pathlib import Path
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 # ---------------- CONFIG ----------------
-GEONAMES_URL = "https://download.geonames.org/export/dump/allCountries.zip"
+KAGGLE_DATASET = "samvelkoch/global-airports-iata-icao-timezone-geo"
 WORKDIR = Path("data")
-ZIP_PATH = WORKDIR / "allCountries.zip"
-TXT_PATH = WORKDIR / "allCountries.txt"
+CSV_PATH = WORKDIR / "airports.csv"
 OUTPUT_CSV = "world_cities_timezones.csv"
 
-# Only include populated places
-ALLOWED_FEATURES = {
-    ("P", "PPL"),   # populated place
-    ("P", "PPLA"),  # seat of a first-order administrative division (e.g. state capital)
-    ("P", "PPLC"),  # capital of a country (e.g. Bogotá, Paris, Tokyo)
-    ("P", "PPLG"),  # seat of government of a political entity
-    # ("P", "PPLA2"), ("P", "PPLA3"), ("P", "PPLA4"),  # lower-level admin seats
-}
-
-# Minimum population to include (keeps output to ~10k rows — manageable for in-app search)
-MIN_POPULATION = 50_000
+# Set to False when a corporate SSL proxy causes certificate verification errors.
+# WARNING: disabling SSL verification exposes the connection to MITM attacks.
+# Prefer adding your corporate root CA to the system trust store instead.
+KAGGLE_SSL_VERIFY = False
 
 # ---------------- HELPERS ----------------
-DOWNLOAD_THREADS = 8  # parallel chunks; tune to your connection
+
+def to_ascii(text: str) -> str:
+    """Normalize a unicode city name to its closest ASCII representation."""
+    return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii").strip()
 
 
-def _get_content_length(url: str) -> int | None:
-    req = urllib.request.Request(url, method="HEAD")
-    with urllib.request.urlopen(req) as resp:
-        cl = resp.headers.get("Content-Length")
-        return int(cl) if cl else None
+def _load_kaggle_credentials() -> tuple[str, str]:
+    """Return (username, key) from env vars or ~/.kaggle/kaggle.json."""
+    username = os.environ.get("KAGGLE_USERNAME", "")
+    key      = os.environ.get("KAGGLE_KEY", "")
+    if username and key:
+        return username, key
+    kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
+    if kaggle_json.exists():
+        with open(kaggle_json) as f:
+            creds = json.load(f)
+        return creds.get("username", ""), creds.get("key", "")
+    raise SystemExit(
+        "Kaggle credentials not found.\n"
+        "Create your API token at https://www.kaggle.com/settings → API → Create New Token\n"
+        "and place kaggle.json in ~/.kaggle/  (or set KAGGLE_USERNAME / KAGGLE_KEY env vars)."
+    )
 
 
-def _download_chunk(
-    url: str,
-    start: int,
-    end: int,
-    dest: Path,
-    index: int,
-    progress: list[int],
-    lock: threading.Lock,
-) -> None:
-    req = urllib.request.Request(url, headers={"Range": f"bytes={start}-{end}"})
-    with urllib.request.urlopen(req) as resp:
-        with open(dest, "r+b") as f:
-            f.seek(start)
-            while True:
-                chunk = resp.read(65536)
-                if not chunk:
-                    break
-                f.write(chunk)
-                with lock:
-                    progress[0] += len(chunk)
+def _download_direct_no_verify() -> None:
+    """Download via Kaggle REST API with SSL verification disabled (corporate proxy workaround)."""
+    try:
+        import requests
+        import urllib3
+    except ImportError:
+        raise SystemExit("Install requests: pip install requests")
+
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    print("  WARNING: SSL verification disabled (KAGGLE_SSL_VERIFY=False).")
+
+    username, key = _load_kaggle_credentials()
+    url = f"https://www.kaggle.com/api/v1/datasets/download/{KAGGLE_DATASET}"
+
+    resp = requests.get(url, auth=(username, key), verify=False, stream=True)
+    resp.raise_for_status()
+
+    total = int(resp.headers.get("Content-Length", 0))
+    downloaded = 0
+    zip_path = WORKDIR / "dataset.zip"
+
+    with open(zip_path, "wb") as f:
+        for chunk in resp.iter_content(chunk_size=65536):
+            f.write(chunk)
+            downloaded += len(chunk)
+            if total:
+                pct = min(downloaded / total * 100, 100)
+                print(f"\r  {pct:5.1f}%  {downloaded/1_048_576:.1f} / {total/1_048_576:.1f} MB",
+                      end="", flush=True)
+    print()
+
+    print(f"Extracting {zip_path.name} ...")
+    with zipfile.ZipFile(zip_path) as zf:
+        zf.extractall(WORKDIR)
+    zip_path.unlink()
 
 
-def _print_progress(progress: list[int], total: int, done_event: threading.Event) -> None:
-    while not done_event.wait(timeout=0.5):
-        downloaded = progress[0]
-        pct = min(downloaded / total * 100, 100) if total else 0
-        mb_done = downloaded / 1_048_576
-        mb_total = total / 1_048_576
-        print(f"\r  {pct:5.1f}%  {mb_done:.1f} / {mb_total:.1f} MB  ({DOWNLOAD_THREADS} threads)", end="", flush=True)
-    # final line
-    print(f"\r  100.0%  {total / 1_048_576:.1f} / {total / 1_048_576:.1f} MB  done          ", flush=True)
-
-
-def download_geonames():
+def download_dataset() -> None:
     WORKDIR.mkdir(exist_ok=True)
-    if ZIP_PATH.exists():
+    if CSV_PATH.exists():
         return
 
-    print("Downloading GeoNames allCountries.zip ...")
-    total = _get_content_length(GEONAMES_URL)
+    print("Downloading Kaggle dataset ...")
 
-    if total is None:
-        # Server doesn't support HEAD or Content-Length — fall back to single stream
-        print("  (server did not return Content-Length, downloading single-stream)")
-        urllib.request.urlretrieve(GEONAMES_URL, ZIP_PATH)
-        return
+    if not KAGGLE_SSL_VERIFY:
+        _download_direct_no_verify()
+    else:
+        try:
+            subprocess.run(
+                [
+                    "kaggle", "datasets", "download",
+                    "-d", KAGGLE_DATASET,
+                    "-p", str(WORKDIR),
+                ],
+                check=True,
+            )
+        except FileNotFoundError:
+            raise SystemExit(
+                "\nkaggle CLI not found. Install it with:\n"
+                "    pip install kaggle\n"
+                "Then create your API token at https://www.kaggle.com/settings → API → Create New Token\n"
+                "and place kaggle.json in ~/.kaggle/  (or set KAGGLE_USERNAME / KAGGLE_KEY env vars)."
+            )
+        except subprocess.CalledProcessError as exc:
+            raise SystemExit(f"Download failed: {exc}")
 
-    # Pre-allocate the file
-    with open(ZIP_PATH, "wb") as f:
-        f.seek(total - 1)
-        f.write(b"\0")
+        for zp in WORKDIR.glob("*.zip"):
+            print(f"Extracting {zp.name} ...")
+            with zipfile.ZipFile(zp) as zf:
+                zf.extractall(WORKDIR)
+            zp.unlink()
 
-    chunk_size = total // DOWNLOAD_THREADS
-    ranges = [
-        (i * chunk_size, (i + 1) * chunk_size - 1 if i < DOWNLOAD_THREADS - 1 else total - 1)
-        for i in range(DOWNLOAD_THREADS)
-    ]
-
-    progress: list[int] = [0]
-    lock = threading.Lock()
-    done_event = threading.Event()
-
-    printer = threading.Thread(target=_print_progress, args=(progress, total, done_event), daemon=True)
-    printer.start()
-
-    threads = [
-        threading.Thread(
-            target=_download_chunk,
-            args=(GEONAMES_URL, start, end, ZIP_PATH, i, progress, lock),
-            daemon=True,
+    if not CSV_PATH.exists():
+        raise SystemExit(
+            f"Expected '{CSV_PATH}' after extraction but it was not found. "
+            "Check the contents of the data/ folder."
         )
-        for i, (start, end) in enumerate(ranges)
-    ]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-
-    done_event.set()
-    printer.join()
-
-
-def extract_geonames():
-    if TXT_PATH.exists():
-        return
-    print("Extracting allCountries.txt ...")
-    with zipfile.ZipFile(ZIP_PATH, "r") as zf:
-        zf.extract("allCountries.txt", WORKDIR)
 
 
 def format_utc_offset(minutes: int) -> str:
@@ -158,23 +158,12 @@ def format_utc_offset(minutes: int) -> str:
 
 
 # ---------------- MAIN ----------------
-def main():
-    download_geonames()
-    extract_geonames()
-
-    out_path = Path(OUTPUT_CSV)
-    if (
-        out_path.exists()
-        and TXT_PATH.exists()
-        and out_path.stat().st_mtime >= TXT_PATH.stat().st_mtime
-    ):
-        print(f"{OUTPUT_CSV} is up-to-date, skipping generation.")
-        return
+def main() -> None:
+    download_dataset()
 
     now_utc = datetime.now(timezone.utc)
 
-    # Pre-compute offset for every unique IANA timezone (~400 total).
-    # Without this, ZoneInfo + utcoffset() is called once per row (~12 M times).
+    # Pre-compute offset per unique IANA timezone to avoid repeated ZoneInfo construction.
     tz_offset_cache: dict[str, int | None] = {}
 
     def get_offset(tz_id: str) -> int | None:
@@ -188,12 +177,68 @@ def main():
                 tz_offset_cache[tz_id] = None
         return tz_offset_cache[tz_id]
 
-    with open(TXT_PATH, encoding="utf-8") as src, open(
-        OUTPUT_CSV, "w", newline="", encoding="utf-8"
-    ) as out:
-        reader = csv.reader(src, delimiter="	")
-        writer = csv.writer(out)
+    # key: (country_code, ascii_city_lower) → entry dict
+    # Multiple airports can share a city; keep one row per city,
+    # preferring the primary city airport (IATA == City_IATA).
+    best: dict[tuple[str, str], dict] = {}
 
+    with open(CSV_PATH, encoding="utf-8") as src:
+        reader = csv.DictReader(src)
+        for row in reader:
+            country_code = (row.get("Country_CodeA2") or "").strip()
+            city_name    = (row.get("City_Name")      or "").strip()
+            iata         = (row.get("IATA")           or "").strip()
+            icao         = (row.get("ICAO")           or "").strip()
+            city_iata    = (row.get("City_IATA")      or "").strip()
+            lat          = (row.get("GeoPointLat")    or "").strip()
+            lon          = (row.get("GeoPointLong")   or "").strip()
+            timezone_id  = (row.get("TimeZone")       or "").strip()
+
+            if not (country_code and city_name and timezone_id and lat and lon):
+                continue
+
+            ascii_name  = to_ascii(city_name)
+            # Fall back to the original name when ASCII normalization produces an
+            # empty string (e.g. fully non-Latin city names like Chinese or Arabic).
+            ascii_lower = (ascii_name or city_name).lower()
+            dedup_key   = (country_code, ascii_lower)
+
+            offset = get_offset(timezone_id)
+            if offset is None:
+                continue
+
+            alts       = {a for a in (iata, icao) if a}
+            is_primary = bool(city_iata and iata == city_iata)
+
+            if dedup_key not in best:
+                best[dedup_key] = {
+                    "country_code": country_code,
+                    "city_name":    city_name,
+                    "ascii_name":   ascii_name or city_name,
+                    "lat":          lat,
+                    "lon":          lon,
+                    "timezone_id":  timezone_id,
+                    "offset":       offset,
+                    "alts":         alts,
+                    "is_primary":   is_primary,
+                }
+            else:
+                entry = best[dedup_key]
+                entry["alts"] |= alts
+                # Upgrade to the primary city airport when we find it
+                if not entry["is_primary"] and is_primary:
+                    entry.update({
+                        "city_name":   city_name,
+                        "ascii_name":  ascii_name or city_name,
+                        "lat":         lat,
+                        "lon":         lon,
+                        "timezone_id": timezone_id,
+                        "offset":      offset,
+                        "is_primary":  True,
+                    })
+
+    with open(OUTPUT_CSV, "w", newline="", encoding="utf-8") as out:
+        writer = csv.writer(out)
         writer.writerow([
             "country_code",
             "city_name",
@@ -205,59 +250,20 @@ def main():
             "utc_offset_minutes",
             "utc_offset_label",
         ])
-
-        for row in reader:
-            # GeoNames allCountries has exactly 19 tab-separated columns.
-            # Index 17 = timezone (IANA), Index 18 = modification_date.
-            # The old unpacking used *_rest which captured both trailing fields,
-            # leaving modification_date in timezone_id — that caused ZoneInfo to
-            # fail on every row and produce an empty CSV.
-            if len(row) < 19:
-                continue
-
-            (
-                geonameid, name, asciiname, alternatenames,
-                lat, lon, fclass, fcode, country_code,
-                cc2, admin1, admin2, admin3, admin4,
-                population, elevation, dem,
-                timezone_id, modification_date
-            ) = row[:19]
-
-            if (fclass, fcode) not in ALLOWED_FEATURES:
-                continue
-
-            if not timezone_id:
-                continue
-
-            # Population filter — keeps output to a practical size
-            try:
-                if int(population or 0) < MIN_POPULATION:
-                    continue
-            except ValueError:
-                continue
-
-            offset = get_offset(timezone_id)
-            if offset is None:
-                continue
-
-            alt_names = "|".join(
-                n for n in alternatenames.split(",")
-                if n and n.lower() not in {name.lower(), asciiname.lower()}
-            )
-
+        for entry in best.values():
             writer.writerow([
-                country_code,
-                name,
-                asciiname,
-                alt_names,
-                lat,
-                lon,
-                timezone_id,
-                offset,
-                format_utc_offset(offset),
+                entry["country_code"],
+                entry["city_name"],
+                entry["ascii_name"],
+                "|".join(sorted(entry["alts"])),
+                entry["lat"],
+                entry["lon"],
+                entry["timezone_id"],
+                entry["offset"],
+                format_utc_offset(entry["offset"]),
             ])
 
-    print(f"Generated {OUTPUT_CSV}")
+    print(f"Generated {OUTPUT_CSV} ({len(best):,} unique cities)")
 
 
 if __name__ == "__main__":

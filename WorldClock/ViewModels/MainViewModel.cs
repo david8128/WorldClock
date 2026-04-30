@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using System.Windows.Threading;
 using WorldClock.Models;
@@ -6,8 +8,11 @@ using WorldClock.Services;
 
 namespace WorldClock.ViewModels;
 
-public sealed class MainViewModel
+public sealed class MainViewModel : INotifyPropertyChanged
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     // ── Accent palette (cycles for dynamically added cities) ─────────────────
     private static readonly string[] AccentCycle =
     [
@@ -28,6 +33,28 @@ public sealed class MainViewModel
 
     /// <summary>Time Translator panel view-model.</summary>
     public TimeTranslatorViewModel Translator { get; }
+
+    // ── Home location ─────────────────────────────────────────────────────────
+
+    private string _homeLocationId = string.Empty;
+
+    /// <summary>TimeZoneId of the home location (empty = none set).</summary>
+    public string HomeLocationId
+    {
+        get => _homeLocationId;
+        private set { _homeLocationId = value; OnPropertyChanged(); }
+    }
+
+    // ── Clock panel layout (compact vertical / expanded wrap) ─────────────────
+
+    private double _clocksCardWidth = double.NaN;
+
+    /// <summary>Card width in the clock panel. NaN = stretch (compact mode). Fixed value = wrap-panel mode.</summary>
+    public double ClocksCardWidth
+    {
+        get => _clocksCardWidth;
+        internal set { _clocksCardWidth = value; OnPropertyChanged(); }
+    }
 
     private readonly DispatcherTimer _timer;
 
@@ -67,8 +94,34 @@ public sealed class MainViewModel
 
         Translator = new TimeTranslatorViewModel(Locations);
 
+        // ── Restore home location ──────────────────────────────────────────────
+        _homeLocationId = saved.HomeLocationId ?? string.Empty;
+        RestoreHomeFlags();
+        RefreshHomeDiffs();
+        if (!string.IsNullOrEmpty(_homeLocationId))
+        {
+            try   { Translator.SetHomeZone(TimeZoneInfo.FindSystemTimeZoneById(_homeLocationId)); }
+            catch { /* invalid saved ID — leave home zone unset */ }
+        }
+
+        // ── Notify all locations when theme changes (updates ThemedAccentBrush) ──
+        // Also rebuild the visualizer grid so TimeGridRow/TimeGridCell get fresh theme-aware colours.
+        ThemeService.Instance.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ThemeService.ActiveTheme))
+            {
+                foreach (var loc in Locations) loc.NotifyThemeChanged();
+                Translator.BuildGrid();
+                Translator.Translate();
+            }
+        };
+
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _timer.Tick += (_, _) => { foreach (var l in Locations) l.Refresh(); };
+        _timer.Tick += (_, _) =>
+        {
+            foreach (var l in Locations) l.Refresh();
+            RefreshHomeDiffs();
+        };
         _timer.Start();
     }
 
@@ -85,6 +138,9 @@ public sealed class MainViewModel
     {
         if (string.IsNullOrWhiteSpace(cityName)) return false;
         if (Locations.Any(l => string.Equals(l.CityName, cityName.Trim(),
+                                             StringComparison.OrdinalIgnoreCase))) return false;
+        // Reject if any existing location already uses the same timezone (same clock, different name)
+        if (Locations.Any(l => string.Equals(l.TimeZoneId, tzId.Trim(),
                                              StringComparison.OrdinalIgnoreCase))) return false;
         try   { TimeZoneInfo.FindSystemTimeZoneById(tzId); }
         catch { return false; }
@@ -112,7 +168,65 @@ public sealed class MainViewModel
                 TeamLabel   = l.TeamLabel,
             })
             .ToList();
+        saved.HomeLocationId = _homeLocationId;
         _store.Save(saved);
+    }
+
+    // ── Home location ─────────────────────────────────────────────────────────
+
+    /// <summary>Marks <paramref name="location"/> as the home city, clears the previous home, and refreshes diffs.</summary>
+    public void SetHomeLocation(ClockLocation location)
+    {
+        HomeLocationId = location.TimeZoneId;
+        foreach (var loc in Locations) loc.IsHome = loc.TimeZoneId == location.TimeZoneId;
+        RefreshHomeDiffs();
+        try   { Translator.SetHomeZone(TimeZoneInfo.FindSystemTimeZoneById(location.TimeZoneId)); }
+        catch { Translator.SetHomeZone(null); }
+        PersistCities();
+    }
+
+    /// <summary>Clears the home location.</summary>
+    public void ClearHomeLocation()
+    {
+        HomeLocationId = string.Empty;
+        foreach (var loc in Locations) { loc.IsHome = false; loc.DiffFromHome = string.Empty; }
+        Translator.SetHomeZone(null);
+        PersistCities();
+    }
+
+    private void RestoreHomeFlags()
+    {
+        foreach (var loc in Locations) loc.IsHome = loc.TimeZoneId == _homeLocationId;
+    }
+
+    private void RefreshHomeDiffs()
+    {
+        if (string.IsNullOrEmpty(_homeLocationId)) return;
+        try
+        {
+            var homeTz  = TimeZoneInfo.FindSystemTimeZoneById(_homeLocationId);
+            var nowUtc  = DateTime.UtcNow;
+            var homeOff = homeTz.GetUtcOffset(nowUtc);
+
+            foreach (var loc in Locations)
+            {
+                if (loc.IsHome) { loc.DiffFromHome = "HOME"; continue; }
+                try
+                {
+                    var tz       = TimeZoneInfo.FindSystemTimeZoneById(loc.TimeZoneId);
+                    var locOff   = tz.GetUtcOffset(nowUtc);
+                    var diffMins = (int)(locOff - homeOff).TotalMinutes;
+                    if (diffMins == 0) { loc.DiffFromHome = "="; continue; }
+                    var sign = diffMins > 0 ? "+" : "-";
+                    var abs  = Math.Abs(diffMins);
+                    var h    = abs / 60;
+                    var m    = abs % 60;
+                    loc.DiffFromHome = m == 0 ? $"{sign}{h}h" : $"{sign}{h}h{m}m";
+                }
+                catch { loc.DiffFromHome = string.Empty; }
+            }
+        }
+        catch { /* home timezone no longer valid — clear */ ClearHomeLocation(); }
     }
 
     /// <summary>Removes a location by reference. The UTC entry (index 0) cannot be removed.</summary>

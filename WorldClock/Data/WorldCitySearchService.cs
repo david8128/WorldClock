@@ -4,12 +4,25 @@ using System.Collections.ObjectModel;
 namespace WorldClock.Data;
 
 /// <summary>
-/// Unified city search service used by both the Time Translator and Settings window.
+/// Unified city search service used by both the Time Visualizer and Settings window.
 /// Searches the curated <see cref="CityDatabase.All"/> collection at startup,
 /// and also loads the generated GeoNames CSV (<c>world_cities_timezones.csv</c>)
 /// when available, merging the two sources.
 ///
-/// Run <c>WorldClock/citiesdb/generate_world_cities_timezones.py</c> to produce the CSV.
+/// CSV schema (header row, columns 0-based):
+///   0  AirportName        — airport display name
+///   1  IATA               — airport IATA code (e.g. LAX, BOG)
+///   2  ICAO               — airport ICAO code
+///   3  TimeZone           — IANA timezone id (e.g. America/Bogota)
+///   4  City_Name          — city display name
+///   5  City_IATA          — city-level IATA code (used as the primary city code)
+///   6  UTC_Offset_Hours   — UTC offset in hours (float)
+///   7  UTC_Offset_Seconds — UTC offset in seconds (float)
+///   8  Country_CodeA2     — ISO 3166-1 alpha-2 country code (e.g. US, CO)
+///   9  Country_CodeA3     — ISO 3166-1 alpha-3 country code
+///  10  Country_Name       — full country name
+///  11  GeoPointLat        — latitude
+///  12  GeoPointLong       — longitude
 /// </summary>
 public static class WorldCitySearchService
 {
@@ -81,6 +94,11 @@ public static class WorldCitySearchService
             partialCodes.Any(code => code.StartsWith(qUpper, StringComparison.Ordinal)))
             score += 60;
 
+        // Code contains (covers queries that are a substring of a code)
+        if (c.Codes is { Length: > 0 } containsCodes &&
+            containsCodes.Any(code => code.Contains(qUpper, StringComparison.Ordinal)))
+            score += 40;
+
         // Starts-with name
         if (city.StartsWith(qUpper,    StringComparison.Ordinal)) score += 70;
         if (country.StartsWith(qUpper, StringComparison.Ordinal)) score += 50;
@@ -136,13 +154,22 @@ public static class WorldCitySearchService
         var next = Path.Combine(AppContext.BaseDirectory, "world_cities_timezones.csv");
         if (File.Exists(next)) return next;
 
-        // 2. Development layout: <repo>/citiesdb/world_cities_timezones.csv
-        //    AppContext.BaseDirectory is e.g. <repo>/WorldClock/bin/Release/net8.0-windows/
-        var dev = Path.GetFullPath(Path.Combine(
+        // 2. Development layout: <project>/citiesdb/world_cities_timezones.csv
+        //    AppContext.BaseDirectory is e.g. <project>/WorldClock/bin/Release/net8.0-windows/
+        //    Going up 3 levels reaches the WorldClock project folder; citiesdb lives there.
+        var dev3 = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..",
+            "citiesdb", "world_cities_timezones.csv"));
+        if (File.Exists(dev3)) return dev3;
+
+        // 3. Alternative dev layout: <repo>/citiesdb/world_cities_timezones.csv
+        //    Going up 4 levels reaches the repository root.
+        var dev4 = Path.GetFullPath(Path.Combine(
             AppContext.BaseDirectory,
             "..", "..", "..", "..",
             "citiesdb", "world_cities_timezones.csv"));
-        if (File.Exists(dev)) return dev;
+        if (File.Exists(dev4)) return dev4;
 
         return null;
     }
@@ -150,7 +177,7 @@ public static class WorldCitySearchService
     private static bool CsvHasData(string path)
     {
         using var r = File.OpenText(path);
-        r.ReadLine();            // skip header
+        r.ReadLine();            // skip header row
         return r.ReadLine() is not null;   // at least one data row?
     }
 
@@ -158,44 +185,95 @@ public static class WorldCitySearchService
         Dictionary<string, (string Name, string Flag)> countryLookup)
     {
         var result = new List<CityEntry>(4096);
+        var seen   = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         using var reader = new StreamReader(path);
-        reader.ReadLine();   // skip header: country_code,city_name,ascii_name,alt_names,lat,lon,iana_timezone,...
+        var header = reader.ReadLine();
+        if (header is null) return result;
+
+        // Auto-detect schema from the header row.
+        // Old schema:  country_code,city_name,ascii_name,alt_names,latitude,longitude,iana_timezone,...
+        // New schema:  AirportName,IATA,ICAO,TimeZone,City_Name,City_IATA,UTC_Offset_Hours,...
+        bool isNewSchema = header.StartsWith("AirportName", StringComparison.OrdinalIgnoreCase);
 
         string? line;
         while ((line = reader.ReadLine()) is not null)
         {
             var p = SplitCsv(line);
-            if (p.Length < 7) continue;
 
-            var code   = p[0];   // country_code
-            var city   = p[1];   // city_name
-            var iana   = p[6];   // iana_timezone
+            if (isNewSchema)
+            {
+                // New schema column indices:
+                //  0=AirportName  1=IATA  2=ICAO  3=TimeZone  4=City_Name  5=City_IATA
+                //  6=UTC_Offset_Hours  7=UTC_Offset_Seconds  8=Country_CodeA2
+                //  9=Country_CodeA3  10=Country_Name  11=GeoPointLat  12=GeoPointLong
+                if (p.Length < 11) continue;
 
-            if (string.IsNullOrWhiteSpace(city) || string.IsNullOrWhiteSpace(iana)) continue;
+                var iana        = p[3].Trim();
+                var cityName    = p[4].Trim();
+                var cityCode    = p[5].Trim().ToUpperInvariant();
+                var airportCode = p[1].Trim().ToUpperInvariant();
+                var countryA2   = p[8].Trim();
+                var countryRaw  = p[10].Trim();
 
-            // IANA → Windows TZ (requires .NET 6+, available on .NET 8)
-            if (!TimeZoneInfo.TryConvertIanaIdToWindowsId(iana, out var winId) ||
-                string.IsNullOrEmpty(winId))
-                continue;
+                if (string.IsNullOrWhiteSpace(cityName) || string.IsNullOrWhiteSpace(iana)) continue;
 
-            var (countryName, flag) = countryLookup.TryGetValue(code, out var ci)
-                ? ci
-                : (code, CodeToFlag(code));
+                var key = $"{countryA2}|{cityName}";
+                if (!seen.Add(key)) continue;
 
-            // alt_names field contains pipe-separated names; short alphanumeric ones become codes
-            var altNames = p.Length > 3 ? p[3] : "";
-            var codes = altNames.Split('|')
-                .Where(n => n.Length is >= 2 and <= 5 && n.All(char.IsLetterOrDigit))
-                .Select(n => n.ToUpperInvariant())
-                .Distinct()
-                .ToArray();
+                if (!TimeZoneInfo.TryConvertIanaIdToWindowsId(iana, out var winId) ||
+                    string.IsNullOrEmpty(winId)) continue;
 
-            result.Add(new CityEntry(
-                Country:     countryName,
-                CountryFlag: flag,
-                City:        city,
-                TimeZoneId:  winId,
-                Codes:       codes.Length > 0 ? codes : null));
+                var (cName, flag) = countryLookup.TryGetValue(countryA2, out var ci)
+                    ? ci
+                    : (!string.IsNullOrWhiteSpace(countryRaw)
+                        ? (countryRaw, CodeToFlag(countryA2))
+                        : (countryA2,  CodeToFlag(countryA2)));
+
+                var codes = new List<string>();
+                if (!string.IsNullOrWhiteSpace(cityCode))   codes.Add(cityCode);
+                if (!string.IsNullOrWhiteSpace(airportCode) &&
+                    !airportCode.Equals(cityCode, StringComparison.OrdinalIgnoreCase))
+                    codes.Add(airportCode);
+
+                result.Add(new CityEntry(Country: cName, CountryFlag: flag, City: cityName,
+                    TimeZoneId: winId, Codes: codes.Count > 0 ? [.. codes] : null));
+            }
+            else
+            {
+                // Old schema column indices:
+                //  0=country_code  1=city_name  2=ascii_name  3=alt_names(pipe-sep)
+                //  4=latitude  5=longitude  6=iana_timezone  7=utc_offset_minutes  8=utc_offset_label
+                if (p.Length < 7) continue;
+
+                var countryCode = p[0].Trim();
+                var cityName    = p[1].Trim();
+                var altNames    = p.Length > 3 ? p[3] : "";
+                var iana        = p[6].Trim();
+
+                if (string.IsNullOrWhiteSpace(cityName) || string.IsNullOrWhiteSpace(iana)) continue;
+
+                var key = $"{countryCode}|{cityName}";
+                if (!seen.Add(key)) continue;
+
+                if (!TimeZoneInfo.TryConvertIanaIdToWindowsId(iana, out var winId) ||
+                    string.IsNullOrEmpty(winId)) continue;
+
+                var (cName, flag) = countryLookup.TryGetValue(countryCode, out var ci)
+                    ? ci
+                    : (countryCode, CodeToFlag(countryCode));
+
+                // alt_names is pipe-separated; keep short alphanumeric tokens as searchable codes
+                var codes = altNames.Split('|')
+                    .Select(n => n.Trim())
+                    .Where(n => n.Length is >= 2 and <= 6 && n.All(char.IsLetterOrDigit))
+                    .Select(n => n.ToUpperInvariant())
+                    .Distinct()
+                    .ToArray();
+
+                result.Add(new CityEntry(Country: cName, CountryFlag: flag, City: cityName,
+                    TimeZoneId: winId, Codes: codes.Length > 0 ? codes : null));
+            }
         }
 
         return result;

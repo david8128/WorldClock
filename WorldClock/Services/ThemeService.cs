@@ -23,8 +23,8 @@ public sealed class ThemeService : INotifyPropertyChanged
         // Restore persisted theme and opacity on first access.
         // Guard: unit-test processes have no AppData path concerns, Load() returns defaults safely.
         var saved = SettingsService.Instance.Load();
-        _theme   = AppTheme.All.FirstOrDefault(t => t.Name == saved.ThemeName) ?? AppTheme.All[0];
-        _opacity = Math.Clamp(saved.Opacity, 0.1, 1.0);
+        _theme     = AppTheme.All.FirstOrDefault(t => t.Name == saved.ThemeName) ?? AppTheme.All[0];
+        _opacity   = Math.Clamp(saved.Opacity, 0.1, 1.0);  // always honour the last saved value
         _scaleMode = saved.ScaleMode;
     }
 
