@@ -23,9 +23,10 @@ public sealed class ThemeService : INotifyPropertyChanged
         // Restore persisted theme and opacity on first access.
         // Guard: unit-test processes have no AppData path concerns, Load() returns defaults safely.
         var saved = SettingsService.Instance.Load();
-        _theme     = AppTheme.All.FirstOrDefault(t => t.Name == saved.ThemeName) ?? AppTheme.All[0];
-        _opacity   = Math.Clamp(saved.Opacity, 0.1, 1.0);  // always honour the last saved value
-        _scaleMode = saved.ScaleMode;
+        _theme          = AppTheme.All.FirstOrDefault(t => t.Name == saved.ThemeName) ?? AppTheme.All[0];
+        _opacity        = Math.Clamp(saved.Opacity, 0.1, 1.0);  // always honour the last saved value
+        _scaleMode      = saved.ScaleMode;
+        _showDiagnostics = saved.ShowDiagnostics;
     }
 
     // ── Active theme ──────────────────────────────────────────────────────────
@@ -82,6 +83,22 @@ public sealed class ThemeService : INotifyPropertyChanged
         get => _editMode;
         set { _editMode = value; OnPropertyChanged(); }
     }
+    // ── Diagnostics window toggle ─────────────────────────────────────────────
+
+    private bool _showDiagnostics;
+
+    public bool ShowDiagnostics
+    {
+        get => _showDiagnostics;
+        set
+        {
+            if (_showDiagnostics == value) return;
+            _showDiagnostics = value;
+            OnPropertyChanged();
+            Persist();
+        }
+    }
+
     // ── Scale mode ────────────────────────────────────────────────────────────
 
     private ScaleMode _scaleMode;
@@ -213,9 +230,10 @@ public sealed class ThemeService : INotifyPropertyChanged
     internal void Persist()
     {
         var saved = SettingsService.Instance.Load();
-        saved.ThemeName = _theme.Name;
-        saved.Opacity   = _opacity;
-        saved.ScaleMode = _scaleMode;
+        saved.ThemeName       = _theme.Name;
+        saved.Opacity         = _opacity;
+        saved.ScaleMode       = _scaleMode;
+        saved.ShowDiagnostics = _showDiagnostics;
         SettingsService.Instance.Save(saved);
     }
 }

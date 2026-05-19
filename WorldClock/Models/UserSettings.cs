@@ -23,6 +23,9 @@ public sealed class UserSettings
 
     /// <summary>Window scale mode. Defaults to ProportionScale (elements shrink with window).</summary>
     public ScaleMode ScaleMode { get; set; } = ScaleMode.ProportionScale;
+
+    /// <summary>When true, the diagnostics/debug window is shown. Default false.</summary>
+    public bool ShowDiagnostics { get; set; } = false;
 }
 
 /// <summary>Minimal data needed to reconstruct a <see cref="ClockLocation"/>.</summary>

@@ -18,10 +18,11 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _headerTimer;
     private readonly DispatcherTimer _globalSearchTimer = new();
 
-    private const int RowHeaderWidth = 160;
+    private const int RowHeaderWidth = 310;
     private const int SlotCellWidth   = 10;  // must match SlotIndexToCanvasLeftConverter.SlotWidthPx
     private bool _isDragging;
     private int  _dragStartSlot;
+    private DiagnosticsWindow? _diagWindow;
 
     // ── Auto-resize constants ─────────────────────────────────────────────────
     // DesignRoot is 1100×760. The Viewbox scales it uniformly to fill the window.
@@ -124,8 +125,33 @@ public partial class MainWindow : Window
             if (args.PropertyName is nameof(ThemeService.EditMode)
                                   or nameof(ThemeService.DeleteMode))
                 UpdateModeButtonStates();
+
+            if (args.PropertyName == nameof(ThemeService.ShowDiagnostics))
+                ApplyDiagnosticsWindow();
         };
         UpdateModeButtonStates();
+        ApplyDiagnosticsWindow();
+    }
+
+    // ── Diagnostics window ────────────────────────────────────────────────────
+
+    private void ApplyDiagnosticsWindow()
+    {
+        if (ThemeService.Instance.ShowDiagnostics)
+        {
+            if (_diagWindow is null || !_diagWindow.IsLoaded)
+            {
+                _diagWindow = new DiagnosticsWindow(_vm);
+                _diagWindow.Left = Left + Width - 660;
+                _diagWindow.Top  = Top + Height + 4;
+                _diagWindow.Show();
+            }
+        }
+        else
+        {
+            _diagWindow?.Close();
+            _diagWindow = null;
+        }
     }
 
     // ── Scale mode ────────────────────────────────────────────────────────────

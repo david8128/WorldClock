@@ -1098,20 +1098,7 @@
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="36"/>    <!-- column header -->
                                         <RowDefinition Height="*"/>     <!-- data rows: scrolls when rows overflow -->
-                                        <RowDefinition Height="Auto"/>  <!-- debug bar: always visible at bottom -->
                                     </Grid.RowDefinitions>
-
-                                    <!-- DEBUG STATUS BAR — shows model state for diagnosis -->
-                                    <Border Grid.Row="2" Background="#CC000000" Padding="8,2">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                                      HorizontalScrollBarVisibility="Disabled"
-                                                      MaxHeight="70">
-                                            <TextBlock Text="{Binding Translator.DiagStatus}"
-                                                       FontFamily="Consolas" FontSize="9"
-                                                       Foreground="#FFFF00"
-                                                       TextWrapping="Wrap"/>
-                                        </ScrollViewer>
-                                    </Border>
 
                                     <!-- Column-header row: 160px spacer + hour labels -->
                                     <Border Grid.Row="0"
@@ -1123,7 +1110,7 @@
                                                  All 48 slots are always visible; each lights up via IsSelected
                                                  when that individual 30-min slot is within the selection range. -->
                                             <StackPanel Orientation="Horizontal">
-                                                <Border Width="160" Background="{DynamicResource BrushBackgroundMid}"/>
+                                                <Border Width="310" Background="{DynamicResource BrushBackgroundMid}"/>
                                                 <ItemsControl ItemsSource="{Binding Translator.Columns}">
                                                     <ItemsControl.ItemContainerStyle>
                                                         <Style TargetType="ContentPresenter">
@@ -1157,7 +1144,7 @@
                                                 </ItemsControl>
                                             </StackPanel>
                                             <!-- Layer 2: hour labels (40px per pair, on top via Grid Z-order, hit-test transparent) -->
-                                            <ItemsControl ItemsSource="{Binding Translator.Columns}" Margin="160,0,0,0"
+                                            <ItemsControl ItemsSource="{Binding Translator.Columns}" Margin="310,0,0,0"
                                                           IsHitTestVisible="False">
                                                 <ItemsControl.ItemContainerStyle>
                                                     <Style TargetType="ContentPresenter">
@@ -1273,7 +1260,7 @@
                                                         <StackPanel Orientation="Horizontal">
 
                                                         <!-- ▌ Row header card (160px, 2-line compact layout) -->
-                                                        <Border Width="160" Height="44"
+                                                        <Border Width="310" Height="44"
                                                                 Background="{DynamicResource BrushBackgroundMid}"
                                                                 BorderBrush="{DynamicResource BrushSeparator}"
                                                                 BorderThickness="0,0,1,1"
@@ -1287,9 +1274,9 @@
                                                                 <!-- 3-section grid:  [city|time|weekday] -->
                                                                 <Grid Margin="3,2,2,2" VerticalAlignment="Center">
                                                                     <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="*"/>      <!-- city -->
-                                                                        <ColumnDefinition Width="Auto"/>   <!-- time range -->
-                                                                        <ColumnDefinition Width="Auto"/>   <!-- date/weekday -->
+                                                                        <ColumnDefinition Width="100"/>    <!-- city: fixed 100px -->
+                                                                        <ColumnDefinition Width="100"/>    <!-- time range: fixed 100px -->
+                                                                        <ColumnDefinition Width="100"/>    <!-- date/weekday: fixed 100px -->
                                                                     </Grid.ColumnDefinitions>
                                                                     <!-- Col 0: Flag + CityName / UTC offset + DST -->
                                                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
@@ -1301,7 +1288,7 @@
                                                                                        FontSize="13" FontWeight="Bold"
                                                                                        Foreground="{DynamicResource BrushTextPrimary}"
                                                                                        TextTrimming="CharacterEllipsis"
-                                                                                       MaxWidth="106" VerticalAlignment="Center"/>
+                                                                                       MaxWidth="94" VerticalAlignment="Center"/>
                                                                         </StackPanel>
                                                                         <TextBlock Text="{Binding UtcOffset}"
                                                                                    FontFamily="Consolas" FontSize="12"
@@ -1499,7 +1486,7 @@
                                                         </StackPanel>
 
                                                         <!-- Layer 2: hour labels (40px per pair, on top via Grid Z-order, hit-test transparent) -->
-                                                        <ItemsControl ItemsSource="{Binding Cells}" Margin="160,0,0,0"
+                                                        <ItemsControl ItemsSource="{Binding Cells}" Margin="310,0,0,0"
                                                                       IsHitTestVisible="False">
                                                             <ItemsControl.ItemContainerStyle>
                                                                 <Style TargetType="ContentPresenter">

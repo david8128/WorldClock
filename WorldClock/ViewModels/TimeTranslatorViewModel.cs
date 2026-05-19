@@ -179,7 +179,7 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
             // ── Compact first line: the numbers most likely to be truncated last ──
             string svX    = _diagScrollViewerX >= 0 ? $"{_diagScrollViewerX:F0}" : "?";
             string srcX   = _diagOrigSrcX      >= 0 ? $"{_diagOrigSrcX:F0}"      : "?";
-            string clkSlot= _lastClickPosX     >= 0 ? $"{(int)((_lastClickPosX - 160) / 10)}" : "?";
+            string clkSlot= _lastClickPosX     >= 0 ? $"{(int)((_lastClickPosX - 310) / 10)}" : "?";
             string clkX   = _lastClickPosX     >= 0 ? $"{_lastClickPosX:F0}"     : "?";
 
             string cpLeft  = _diagCpCanvasLeft >= 0 ? $"{_diagCpCanvasLeft:F0}" : "?";
@@ -723,7 +723,7 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         var refZone  = _homeZone ?? _sourceZone;
         var now      = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, refZone);
         double slots = now.Hour * 2.0 + now.Minute / 30.0;  // fractional slot index
-        double left  = 160.0 + slots * 10.0;                 // 160 = row-header width px
+        double left  = 310.0 + slots * 10.0;                 // 310 = row-header width px
         DiagLog.Debug($"ComputeCurrentTimeLeft: refZone={refZone.Id}, now={now:HH:mm:ss}, slots={slots:F2}, left={left:F1}px");
         return left;
     }

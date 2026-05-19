@@ -45,6 +45,10 @@ public partial class SettingsWindow : Window
         ProportionScaleRadio.IsChecked = _theme.ScaleMode == ScaleMode.ProportionScale;
         MinLimitRadio.IsChecked        = _theme.ScaleMode == ScaleMode.MinLimit;
 
+        // Diagnostics toggle sync
+        DiagnosticsToggle.IsChecked = _theme.ShowDiagnostics;
+        UpdateDiagnosticsToggleContent();
+
         // Placeholder visibility
         CityNameBox.TextChanged  += (_, _) => CityNamePlaceholder.Visibility =
             string.IsNullOrEmpty(CityNameBox.Text) ? Visibility.Visible : Visibility.Collapsed;
@@ -365,6 +369,27 @@ public partial class SettingsWindow : Window
     {
         if (EditModeToggle == null) return;
         EditModeToggle.Content = _theme.EditMode ? "Edit Mode: ON" : "Edit Mode: OFF";
+    }
+
+    // Diagnostics window toggle
+    private void DiagnosticsToggle_Checked(object sender, RoutedEventArgs e)
+    {
+        _theme.ShowDiagnostics = true;
+        UpdateDiagnosticsToggleContent();
+    }
+
+    private void DiagnosticsToggle_Unchecked(object sender, RoutedEventArgs e)
+    {
+        _theme.ShowDiagnostics = false;
+        UpdateDiagnosticsToggleContent();
+    }
+
+    private void UpdateDiagnosticsToggleContent()
+    {
+        if (DiagnosticsToggle == null) return;
+        DiagnosticsToggle.Content = _theme.ShowDiagnostics
+            ? "Diagnostics Window: ON"
+            : "Diagnostics Window: OFF";
     }
 
     // Close
