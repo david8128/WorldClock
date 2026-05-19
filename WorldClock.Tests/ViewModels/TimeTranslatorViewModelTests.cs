@@ -85,10 +85,11 @@ public sealed class TimeTranslatorViewModelTests
     }
 
     [Fact]
-    public void Constructor_DefaultSourceZone_IsUtc()
+    public void Constructor_DefaultSourceZone_IsLocalMachineTimezone()
     {
         var vm = new TimeTranslatorViewModel(new ObservableCollection<ClockLocation>());
-        vm.SourceZone.Id.Should().Be("UTC");
+        vm.SourceZone.Id.Should().Be(TimeZoneInfo.Local.Id,
+            "default source zone should be the machine local timezone so column headers show local time before a home location is set");
     }
 
     [Fact]
@@ -348,5 +349,160 @@ public sealed class TimeTranslatorViewModelTests
         };
 
         act.Should().NotThrow("ambiguous DST time should not throw");
+    }
+
+    // ── Selection / cell alignment ────────────────────────────────────────────
+    // These tests verify that the selected slot index, the hour/minute properties,
+    // and the cell IsSelected flags all point to the SAME slot so that the column
+    // header highlight and every row's cell highlight are pixel-aligned.
+
+    [Fact]
+    public void SetSelectionRange_SingleSlot_ColumnAndAllCellsSelected()
+    {
+        // With srcZone = UTC and slot 10 (05:00 UTC), every row's cell[10]
+        // must be IsSelected=true and cells outside [10] must be false.
+        var locs = MakeLocations(
+            ("New York", "🇺🇸", "Eastern Standard Time"),
+            ("Tokyo",    "🇯🇵", "Tokyo Standard Time"));
+        var vm = BuildVm(locs, "UTC", new DateTime(2026, 5, 7), 0, 0);
+
+        vm.SetSelectionRange(10, 10);
+
+        // Column highlight
+        vm.Columns[10].IsSelected.Should().BeTrue("column header slot 10 must be selected");
+        vm.Columns[9].IsSelected.Should().BeFalse("adjacent column 9 must not be selected");
+        vm.Columns[11].IsSelected.Should().BeFalse("adjacent column 11 must not be selected");
+
+        // Every data row
+        foreach (var row in vm.Rows)
+        {
+            row.Cells[10].IsSelected.Should().BeTrue(
+                $"row '{row.CityName}' cell[10] must be selected when selection=10");
+            row.Cells[9].IsSelected.Should().BeFalse(
+                $"row '{row.CityName}' cell[9] must not be selected");
+            row.Cells[11].IsSelected.Should().BeFalse(
+                $"row '{row.CityName}' cell[11] must not be selected");
+        }
+    }
+
+    [Fact]
+    public void SetSelectionRange_HourAndMinuteMatchSlot()
+    {
+        // Hour/Minute properties must reflect the START slot so the search bar
+        // text field and the column highlight both show the same time.
+        var vm = new TimeTranslatorViewModel(new ObservableCollection<ClockLocation>());
+        vm.SetSelectionRange(20, 20);   // slot 20 = 10:00
+
+        vm.Hour.Should().Be("10",  "slot 20 / 2 = hour 10");
+        vm.Minute.Should().Be("00", "slot 20 % 2 = 0 → 00 minutes");
+        vm.SelectionStart.Should().Be(20);
+
+        vm.SetSelectionRange(21, 21);   // slot 21 = 10:30
+        vm.Hour.Should().Be("10",  "slot 21 / 2 = hour 10");
+        vm.Minute.Should().Be("30", "slot 21 % 2 = 1 → 30 minutes");
+        vm.SelectionStart.Should().Be(21);
+    }
+
+    [Fact]
+    public void SetSelectionRange_Range_AllSlotsInRangeSelected()
+    {
+        // Multi-slot selection: columns and cells in [start..end] must all be
+        // selected; slots outside the range must not be.
+        var locs = MakeLocations(("New York", "🇺🇸", "Eastern Standard Time"));
+        var vm   = BuildVm(locs, "UTC", new DateTime(2026, 5, 7), 0, 0);
+
+        vm.SetSelectionRange(10, 13);  // slots 10–13 (05:00 – 06:30 UTC)
+
+        for (int s = 10; s <= 13; s++)
+        {
+            vm.Columns[s].IsSelected.Should().BeTrue(
+                $"column slot {s} must be selected in range [10,13]");
+            foreach (var row in vm.Rows)
+                row.Cells[s].IsSelected.Should().BeTrue(
+                    $"row '{row.CityName}' cell[{s}] must be selected in range [10,13]");
+        }
+
+        vm.Columns[9].IsSelected.Should().BeFalse("slot 9 is before the range");
+        vm.Columns[14].IsSelected.Should().BeFalse("slot 14 is after the range");
+    }
+
+    [Fact]
+    public void SetSelectionRange_ClearsOldHighlight_BeforeApplyingNew()
+    {
+        // After moving selection from slot 5 to slot 30, slot 5 must be deselected.
+        var locs = MakeLocations(("Bogota", "🇨🇴", "SA Pacific Standard Time"));
+        var vm   = BuildVm(locs, "UTC", new DateTime(2026, 5, 7), 0, 0);
+
+        vm.SetSelectionRange(5, 5);
+        vm.SetSelectionRange(30, 30);
+
+        vm.Columns[5].IsSelected.Should().BeFalse("old slot 5 must be cleared");
+        vm.Columns[30].IsSelected.Should().BeTrue("new slot 30 must be selected");
+        foreach (var row in vm.Rows)
+        {
+            row.Cells[5].IsSelected.Should().BeFalse(
+                $"row '{row.CityName}' old cell[5] must be cleared");
+            row.Cells[30].IsSelected.Should().BeTrue(
+                $"row '{row.CityName}' new cell[30] must be selected");
+        }
+    }
+
+    [Fact]
+    public void SetSelectionRange_ColumnSlotIndex_MatchesCellSlotIndex()
+    {
+        // The critical alignment invariant: Columns[S].SlotIndex == S must equal
+        // every row's Cells[S].SlotIndex.  Canvas.Left = SlotIndex * 10px, so
+        // if they match, header highlights and cell boxes are guaranteed pixel-aligned.
+        var locs = MakeLocations(
+            ("New York",  "🇺🇸", "Eastern Standard Time"),
+            ("Bogota",    "🇨🇴", "SA Pacific Standard Time"),
+            ("Tokyo",     "🇯🇵", "Tokyo Standard Time"));
+        var vm = BuildVm(locs, "UTC", new DateTime(2026, 5, 7), 0, 0);
+
+        for (int s = 0; s < 48; s++)
+        {
+            vm.Columns[s].SlotIndex.Should().Be(s,
+                $"Columns[{s}].SlotIndex must equal {s} so Canvas.Left = {s * 10}px");
+
+            foreach (var row in vm.Rows)
+                row.Cells[s].SlotIndex.Should().Be(s,
+                    $"Row '{row.CityName}' Cells[{s}].SlotIndex must equal {s}");
+        }
+    }
+
+    [Fact]
+    public void SetSelectionRange_ColumnAndCellCountIs48()
+    {
+        // Both Columns and every row's Cells must have exactly 48 entries.
+        var locs = MakeLocations(("New York", "🇺🇸", "Eastern Standard Time"));
+        var vm   = BuildVm(locs, "UTC", new DateTime(2026, 5, 7), 0, 0);
+
+        vm.Columns.Should().HaveCount(48, "48 half-hour slots per day");
+        foreach (var row in vm.Rows)
+            row.Cells.Should().HaveCount(48,
+                $"row '{row.CityName}' must have 48 cells");
+    }
+
+    [Fact]
+    public void SetHomeZone_BeforeExplicitClick_SnapsToColombia_NotUtc()
+    {
+        // The initial selection must be at the START of the current hour in the home
+        // timezone (Colombia = UTC-5) — always an even slot (:00, not :30).
+        // Before the fix, the first render used srcZone=UTC causing a 5-hour shift.
+        var locs = MakeLocations(("Bogota", "🇨🇴", "SA Pacific Standard Time"));
+        var vm   = new TimeTranslatorViewModel(locs);
+
+        var colombia = TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
+        vm.SetHomeZone(colombia);
+
+        // EffectiveZone must be Colombia
+        vm.EffectiveZone.Id.Should().Be("SA Pacific Standard Time",
+            "after SetHomeZone, EffectiveZone must be Colombia, not UTC");
+
+        // SelectionStart must match the current 30-minute slot in Colombia time.
+        var now      = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, colombia);
+        var expected = now.Hour * 2 + (now.Minute >= 30 ? 1 : 0);
+        vm.SelectionStart.Should().Be(expected,
+            $"SelectionStart must be at slot {expected} (Colombia local {now:HH:mm}), not at the UTC-offset slot");
     }
 }

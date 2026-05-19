@@ -77,13 +77,16 @@ public sealed class TimeGridCellLabelTests
     private static TimeGridColumn MakeColumn(int slotIndex, string slotLabel)
         => new()
         {
-            SlotIndex   = slotIndex,
-            SlotLabel   = slotLabel,
-            IsHourStart = slotIndex % 2 == 0,
+            SlotIndex      = slotIndex,
+            SlotLabel      = slotLabel,
+            IsHourStart    = slotIndex % 2 == 0,
+            IsMidnight     = slotIndex == 0,
+            DayOfWeekLabel = string.Empty,
+            DateShortLabel = string.Empty,
         };
 
     [Theory]
-    [InlineData(0,  "12a", "12", "am")]
+    [InlineData(0,  "12a", "",   "")]   // midnight slot — IsMidnight suppresses hour/am-pm (shows day/date label instead)
     [InlineData(2,  "1a",  "1",  "am")]
     [InlineData(14, "7a",  "7",  "am")]
     [InlineData(24, "12p", "12", "pm")]

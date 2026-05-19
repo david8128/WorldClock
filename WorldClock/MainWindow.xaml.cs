@@ -19,7 +19,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _globalSearchTimer = new();
 
     private const int RowHeaderWidth = 160;
-    private const int SlotCellWidth   = 14;
+    private const int SlotCellWidth   = 10;  // must match SlotIndexToCanvasLeftConverter.SlotWidthPx
     private bool _isDragging;
     private int  _dragStartSlot;
 
@@ -188,6 +188,9 @@ public partial class MainWindow : Window
         if (sender is Button { Tag: ClockLocation loc })
         {
             loc.CommitEdit();
+            // Rebuild the Time Visualizer so TimeGridRow picks up the updated AccentBrush.
+            _vm.Translator.BuildGrid();
+            _vm.Translator.Translate();
             _vm.PersistCities();
         }
     }
@@ -440,6 +443,21 @@ public partial class MainWindow : Window
                                System.Windows.Threading.DispatcherPriority.Background);
     }
 
+    private void CreateTeamsMeeting_Click(object sender, RoutedEventArgs e)
+    {
+        var (teamsUri, browserUri) = _vm.Translator.BuildTeamsDeepLink();
+        try
+        {
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(teamsUri) { UseShellExecute = true });
+        }
+        catch
+        {
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(browserUri) { UseShellExecute = true });
+        }
+    }
+
     // ── Time Visualizer — grid drag-select (transposed: click/drag across slots) ──
 
     private int GetSlotFromPosition(FrameworkElement container, Point pos)
@@ -453,11 +471,64 @@ public partial class MainWindow : Window
     {
         if (sender is not FrameworkElement fe) return;
         var pos = e.GetPosition(fe);
+
+        // Publish raw pos.X to DiagStatus immediately
+        _vm.Translator.LastClickPosX = pos.X;
+
+        // ── Alignment diagnostics: measure actual element positions ──────────
+        // GridScrollViewer origin tells us where the data-row area ACTUALLY starts
+        // inside the TranslatorResults Border (x should be 0 if layout is correct).
+        // OriginalSource origin confirms where the clicked element starts.
+        try
+        {
+            var svOrigin = GridScrollViewer.TransformToAncestor(fe).Transform(new Point(0, 0));
+            _vm.Translator.DiagScrollViewerX = svOrigin.X;
+            DiagLog.Info($"GridScrollViewer in Border: x={svOrigin.X:F1}, y={svOrigin.Y:F1}");
+
+            if (e.OriginalSource is UIElement origSrc)
+            {
+                var srcOrigin = origSrc.TransformToAncestor(fe).Transform(new Point(0, 0));
+                _vm.Translator.DiagOrigSrcX = srcOrigin.X;
+                DiagLog.Info($"OrigSrc={origSrc.GetType().Name}, in Border: x={srcOrigin.X:F1}");
+
+                // Walk the visual tree up from origSrc to find the parent ContentPresenter
+                // and the Canvas (ItemsPanel) that contains it.  This tells us:
+                //   CP.CanvasLeft = slot * 10  →  hitSlot = CP.CanvasLeft / 10
+                //   Canvas.x      = actual x-start of the Layer-1a Canvas in TranslatorResults coords
+                //                   (expected: 160).  If != 160 the header spacer is wider than 160 px.
+                DependencyObject? cursor2 = origSrc;
+                ContentPresenter? hitCp   = null;
+                Canvas? hitCanvas         = null;
+                while (cursor2 is not null && !ReferenceEquals(cursor2, fe))
+                {
+                    cursor2 = VisualTreeHelper.GetParent(cursor2);
+                    if (cursor2 is ContentPresenter cp2 && hitCp     is null) hitCp     = cp2;
+                    if (cursor2 is Canvas          cv  && hitCanvas  is null) hitCanvas = cv;
+                    if (hitCp is not null && hitCanvas is not null) break;
+                }
+                if (hitCp is not null && hitCanvas is not null)
+                {
+                    double cpLeft   = Canvas.GetLeft(hitCp);
+                    var    canvPos  = hitCanvas.TransformToAncestor(fe).Transform(new Point(0, 0));
+                    _vm.Translator.DiagCpCanvasLeft = cpLeft;
+                    _vm.Translator.DiagCanvas1aX    = canvPos.X;
+                    DiagLog.Info($"  CP.CanvasLeft={cpLeft:F0}, Canvas(L1a).x={canvPos.X:F1}");
+                }
+            }
+        }
+        catch (Exception ex) { DiagLog.Info($"TransformToAncestor error: {ex.Message}"); }
+
+        // Log raw coordinates
+        var feW     = fe.ActualWidth;
+        var rawSlot = GetSlotFromPosition(fe, pos);
+        DiagLog.Info($"GridArea_MouseDown: pos.X={pos.X:F1}, rawSlot={rawSlot}, " +
+                     $"fe.ActualWidth={feW:F1}, xInCells={pos.X - RowHeaderWidth:F1}");
+
         if (pos.X < RowHeaderWidth) return;  // clicked in row-header zone
 
         _isDragging    = true;
-        _dragStartSlot = GetSlotFromPosition(fe, pos);
-        _vm.Translator.SetSelectionRange(_dragStartSlot, _dragStartSlot);
+        _dragStartSlot = rawSlot;
+        _vm.Translator.SetSelectionRange(rawSlot, rawSlot);
         fe.CaptureMouse();
         e.Handled = true;
     }
@@ -779,8 +850,11 @@ public partial class MainWindow : Window
 
     private void SelectCurrentSlot()
     {
-        var now  = DateTime.Now;
+        // Use the same reference timezone as the grid columns (home zone, or source zone).
+        var zone = _vm.Translator.EffectiveZone;
+        var now  = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone);
         var slot = now.Hour * 2 + (now.Minute >= 30 ? 1 : 0);
+        DiagLog.Info($"SelectCurrentSlot: zone={zone.Id}, utcNow={DateTime.UtcNow:HH:mm:ss}, localNow={now:HH:mm:ss}, slot={slot}");
         _vm.Translator.SetSelectionRange(slot, slot);
     }
 

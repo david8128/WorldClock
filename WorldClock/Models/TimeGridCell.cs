@@ -129,5 +129,24 @@ public sealed class TimeGridCell : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Mirrors <see cref="WorldClock.Models.TimeGridColumn.IsHourSelected"/> for data-row cells.
+    /// True for even slots when the 20px hour span [SlotIndex, SlotIndex+1] overlaps
+    /// the selection [start, end].  Always false for odd slots.
+    /// Drives the 20px-wide selection highlight in data rows so it exactly matches
+    /// the 20px-wide time-label border rendered by Layer 2.
+    /// </summary>
+    private bool _isHourSelected;
+    public bool IsHourSelected
+    {
+        get => _isHourSelected;
+        set
+        {
+            if (_isHourSelected == value) return;
+            _isHourSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHourSelected)));
+        }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 }

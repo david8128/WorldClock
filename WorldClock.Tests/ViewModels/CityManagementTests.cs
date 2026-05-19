@@ -67,13 +67,38 @@ public class CityManagementTests
     }
 
     [StaFact]
+    public void AddLocation_CityStateFormat_NormalizesToCityName()
+    {
+        // "New York, New York" should be stored as "New York" and treated as duplicate of "New York".
+        var vm = TestViewModel.Fresh();
+        vm.AddLocation("New York, New York", "Eastern Standard Time").Should().BeFalse(); // duplicate of default "New York"
+    }
+
+    [StaFact]
+    public void AddLocation_CityStateFormat_StoredWithoutState()
+    {
+        // "Seattle, Washington" → stored as "Seattle", not "Seattle, Washington"
+        var vm = TestViewModel.Fresh();
+        vm.AddLocation("Seattle, Washington", "Pacific Standard Time").Should().BeTrue();
+        vm.Locations.Should().Contain(l => l.CityName == "Seattle");
+        vm.Locations.Should().NotContain(l => l.CityName == "Seattle, Washington");
+    }
+
+    [StaFact]
+    public void AddLocation_SameTimezone_DifferentCityName_Succeeds()
+    {
+        // Rome and Milan share "W. Europe Standard Time" — both must be addable.
+        var vm = TestViewModel.Fresh();
+        vm.AddLocation("Milan", "W. Europe Standard Time").Should().BeTrue();
+        vm.AddLocation("Rome",  "W. Europe Standard Time").Should().BeTrue();
+        vm.Locations.Should().Contain(l => l.CityName == "Milan");
+        vm.Locations.Should().Contain(l => l.CityName == "Rome");
+    }
+
+    [StaFact]
     public void AddLocation_SetsTeamLabel_Correctly()
     {
         var vm = TestViewModel.Fresh();
-        vm.AddLocation("Paris", "Romance Standard Time", "France Team");
-
-        // Romance Standard Time is already in the list (Madrid) — duplicate check
-        // Use a unique timezone
         vm.AddLocation("Auckland", "New Zealand Standard Time", "NZ Team");
         var loc = vm.Locations.FirstOrDefault(l => l.CityName == "Auckland");
         loc.Should().NotBeNull();

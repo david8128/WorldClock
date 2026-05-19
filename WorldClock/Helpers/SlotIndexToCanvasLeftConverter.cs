@@ -12,10 +12,10 @@ namespace WorldClock.Helpers;
 [ValueConversion(typeof(int), typeof(double))]
 public sealed class SlotIndexToCanvasLeftConverter : IValueConverter
 {
-    public const double SlotWidthPx = 14.0;
+    public const double SlotWidthPx = 10.0;
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        => value is int idx ? idx * SlotWidthPx : 0.0;
+        => value is int slot ? slot * SlotWidthPx : 0.0;
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => value is double x ? (int)(x / SlotWidthPx) : 0;

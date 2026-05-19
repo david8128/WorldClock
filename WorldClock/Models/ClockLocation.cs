@@ -24,11 +24,22 @@ public sealed class ClockLocation : INotifyPropertyChanged
     private bool   _isEditing;
     private string _editingCityName    = string.Empty;
     private string _editingCountryFlag = string.Empty;
-    private string _editingTeamLabel   = string.Empty;
-
+    private string _editingTeamLabel   = string.Empty;    private string _editingAccentHex   = string.Empty;
     // ── Immutable identity ────────────────────────────────────────────────────
-    public required string          TimeZoneId  { get; init; }
-    public required SolidColorBrush AccentBrush { get; init; }
+    public required string TimeZoneId { get; init; }
+
+    private SolidColorBrush _accentBrush = null!;
+    public required SolidColorBrush AccentBrush
+    {
+        get => _accentBrush;
+        set
+        {
+            if (_accentBrush == value) return;
+            _accentBrush = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ThemedAccentBrush));
+        }
+    }
 
     /// <summary>Returns a light-theme variant of <see cref="AccentBrush"/> that keeps the original
     /// hue and saturation but reduces the HSV Value until WCAG AA contrast (4.5:1) against white
@@ -111,12 +122,21 @@ public sealed class ClockLocation : INotifyPropertyChanged
         set { _editingTeamLabel = value; OnPropertyChanged(); }
     }
 
+    /// <summary>Scratch accent hex colour used while editing, e.g. "#00E5FF".</summary>
+    public string EditingAccentHex
+    {
+        get => _editingAccentHex;
+        set { _editingAccentHex = value; OnPropertyChanged(); }
+    }
+
     /// <summary>Copies current values to scratch fields and enters edit mode.</summary>
     public void BeginEdit()
     {
         EditingCityName    = CityName;
         EditingCountryFlag = CountryFlag;
         EditingTeamLabel   = TeamLabel;
+        var c = AccentBrush.Color;
+        EditingAccentHex   = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
         IsEditing          = true;
     }
 
@@ -126,6 +146,15 @@ public sealed class ClockLocation : INotifyPropertyChanged
         if (!string.IsNullOrWhiteSpace(EditingCityName))    CityName    = EditingCityName.Trim();
         if (!string.IsNullOrWhiteSpace(EditingCountryFlag)) CountryFlag = EditingCountryFlag.Trim();
         TeamLabel = EditingTeamLabel.Trim();   // allow empty team label
+        if (!string.IsNullOrWhiteSpace(EditingAccentHex))
+        {
+            try
+            {
+                var color = (Color)ColorConverter.ConvertFromString(EditingAccentHex);
+                AccentBrush = new SolidColorBrush(color);
+            }
+            catch { /* invalid hex — keep current brush */ }
+        }
         IsEditing = false;
     }
 

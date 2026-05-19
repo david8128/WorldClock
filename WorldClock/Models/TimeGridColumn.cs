@@ -39,5 +39,26 @@ public sealed class TimeGridColumn : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// True when this column's HOUR (either the :00 slot or its paired :30 slot)
+    /// is touched by the current selection window.
+    /// Only meaningful for even (IsHourStart) slots — always false for odd slots.
+    /// Used by the column-header layer-1 XAML: each 20px-wide hour cell highlights
+    /// via this property so the highlight width exactly matches the 20px label width.
+    /// Overlap condition: this slot's hour spans [SlotIndex, SlotIndex+1], which
+    /// overlaps selection [start, end] when (SlotIndex+1 >= start AND SlotIndex <= end).
+    /// </summary>
+    private bool _isHourSelected;
+    public bool IsHourSelected
+    {
+        get => _isHourSelected;
+        set
+        {
+            if (_isHourSelected == value) return;
+            _isHourSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHourSelected)));
+        }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 }

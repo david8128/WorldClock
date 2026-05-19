@@ -30,3 +30,5 @@ Feature: This fixes all bugs
         [Solved]            Clocks by city should appear only once, if same location was already present don't do anything, nor popup nor adding any new city
         [Solved]            Instead of -1d it should have the reference from home location and detect wether any location has visibility of next day in the same timeline, if so with a highlighted type of color more visible it should appear +1d on corresponding clocks instead of -1d in other days.
         [Solved]            As shown in @file:wtbmca.png when there is change of date in the timeline, instead of 12 am it should show the weekday on he top of the merged cell pair and instead of 12am change to Month and date, so it would be May 1 instead of 12 am, use short version of month
+        [Solved]            Text in all clocks and time visualizer is very tiny compared to WorldTimeBuddy, text should be more visible like increase 30% or more to be more readable.
+        [Solved]            Currently selection is limited to 1h not half hour as before

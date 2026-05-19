@@ -56,8 +56,13 @@ public sealed class SettingsUITests : IDisposable
     private void SkipIfNoApp()
     {
         if (!_appAvailable)
-            throw new InvalidOperationException(
-                $"[SKIP] WorldClock.exe not found — build the main project first. Path: {AppExePath}");
+        {
+            var msg = $"WorldClock.exe not found — build the main project first. Path: {AppExePath}";
+            // Xunit.Sdk.SkipException ctor signature differs between reference and runtime assemblies.
+            // Use reflection to create it so the correct runtime constructor is called.
+            var ex = (Exception)Activator.CreateInstance(typeof(Xunit.Sdk.SkipException), msg)!;
+            throw ex;
+        }
     }
 
     private static AutomationElement? FindByName(AutomationElement root, string name) =>
@@ -68,6 +73,33 @@ public sealed class SettingsUITests : IDisposable
             .Select(e => e.Name ?? string.Empty)
             .Where(n => !string.IsNullOrWhiteSpace(n))
             .ToList();
+
+    /// <summary>
+    /// Finds the Settings window reliably across FlaUI versions.
+    /// <c>GetAllTopLevelWindows</c> may skip owned dialogs on <c>WindowStyle=None</c>
+    /// windows; we fall back to scanning the desktop and then the main window's
+    /// owned popup children.
+    /// </summary>
+    private Window? FindSettingsWindow()
+    {
+        // 1. Standard approach (works when the dialog is truly top-level)
+        var byProcess = _app!.GetAllTopLevelWindows(_automation)
+            .FirstOrDefault(w => w.Title == "Settings");
+        if (byProcess != null) return byProcess;
+
+        // 2. Owned dialogs may appear as direct children of the desktop element
+        var desktop = _automation.GetDesktop();
+        var onDesktop = desktop.FindAllChildren()
+            .FirstOrDefault(e =>
+                e.ControlType == ControlType.Window && e.Name == "Settings");
+        if (onDesktop != null) return onDesktop.AsWindow();
+
+        // 3. Search descendants of the main window (e.g. if WPF nests the dialog)
+        var mainWin = _app!.GetMainWindow(_automation, TimeSpan.FromSeconds(2));
+        var nested = mainWin?.FindFirstDescendant(x =>
+            x.ByControlType(ControlType.Window).And(x.ByName("Settings")));
+        return nested?.AsWindow();
+    }
 
     // ── Settings button presence ──────────────────────────────────────────────
 
@@ -96,8 +128,7 @@ public sealed class SettingsUITests : IDisposable
 
         Thread.Sleep(SettingsDelay);
 
-        var settingsWin = _app!.GetAllTopLevelWindows(_automation)
-            .FirstOrDefault(w => w.Title == "Settings");
+        var settingsWin = FindSettingsWindow();
 
         settingsWin.Should().NotBeNull("clicking the gear icon must open the Settings window");
         settingsWin?.Close();
@@ -115,12 +146,12 @@ public sealed class SettingsUITests : IDisposable
         FindByName(window, "SettingsButton")!.AsButton().Invoke();
         Thread.Sleep(SettingsDelay);
 
-        var settingsWin = _app!.GetAllTopLevelWindows(_automation)
-            .First(w => w.Title == "Settings");
+        var settingsWin = FindSettingsWindow();
+        settingsWin.Should().NotBeNull("the Settings window must open");
 
-        var cityBox = FindByName(settingsWin, "CityName");
+        var cityBox = FindByName(settingsWin!, "CityName");
         cityBox.Should().NotBeNull("the settings window must have a CityName text box");
-        settingsWin.Close();
+        settingsWin?.Close();
     }
 
     [Fact]
@@ -133,12 +164,12 @@ public sealed class SettingsUITests : IDisposable
         FindByName(window, "SettingsButton")!.AsButton().Invoke();
         Thread.Sleep(SettingsDelay);
 
-        var settingsWin = _app!.GetAllTopLevelWindows(_automation)
-            .First(w => w.Title == "Settings");
+        var settingsWin = FindSettingsWindow();
+        settingsWin.Should().NotBeNull("the Settings window must open");
 
-        var combo = FindByName(settingsWin, "TimezoneSelector");
+        var combo = FindByName(settingsWin!, "TimezoneSelector");
         combo.Should().NotBeNull("the settings window must have a timezone combo box");
-        settingsWin.Close();
+        settingsWin?.Close();
     }
 
     [Fact]
@@ -151,12 +182,12 @@ public sealed class SettingsUITests : IDisposable
         FindByName(window, "SettingsButton")!.AsButton().Invoke();
         Thread.Sleep(SettingsDelay);
 
-        var settingsWin = _app!.GetAllTopLevelWindows(_automation)
-            .First(w => w.Title == "Settings");
+        var settingsWin = FindSettingsWindow();
+        settingsWin.Should().NotBeNull("the Settings window must open");
 
-        var teamBox = FindByName(settingsWin, "TeamLabel");
+        var teamBox = FindByName(settingsWin!, "TeamLabel");
         teamBox.Should().NotBeNull("the settings window must have a TeamLabel text box");
-        settingsWin.Close();
+        settingsWin?.Close();
     }
 
     [Fact]
@@ -169,12 +200,12 @@ public sealed class SettingsUITests : IDisposable
         FindByName(window, "SettingsButton")!.AsButton().Invoke();
         Thread.Sleep(SettingsDelay);
 
-        var settingsWin = _app!.GetAllTopLevelWindows(_automation)
-            .First(w => w.Title == "Settings");
+        var settingsWin = FindSettingsWindow();
+        settingsWin.Should().NotBeNull("the Settings window must open");
 
-        var addBtn = FindByName(settingsWin, "AddCityButton");
+        var addBtn = FindByName(settingsWin!, "AddCityButton");
         addBtn.Should().NotBeNull("the settings window must have an Add City button");
-        settingsWin.Close();
+        settingsWin?.Close();
     }
 
     // ── Delete-mode toggle ────────────────────────────────────────────────────
@@ -189,12 +220,12 @@ public sealed class SettingsUITests : IDisposable
         FindByName(window, "SettingsButton")!.AsButton().Invoke();
         Thread.Sleep(SettingsDelay);
 
-        var settingsWin = _app!.GetAllTopLevelWindows(_automation)
-            .First(w => w.Title == "Settings");
+        var settingsWin = FindSettingsWindow();
+        settingsWin.Should().NotBeNull("the Settings window must open");
 
-        var toggle = FindByName(settingsWin, "DeleteModeToggle");
+        var toggle = FindByName(settingsWin!, "DeleteModeToggle");
         toggle.Should().NotBeNull("the settings window must have a Delete Mode toggle button");
-        settingsWin.Close();
+        settingsWin?.Close();
     }
 
     [Fact]
@@ -212,12 +243,12 @@ public sealed class SettingsUITests : IDisposable
         FindByName(window, "SettingsButton")!.AsButton().Invoke();
         Thread.Sleep(SettingsDelay);
 
-        var settingsWin = _app!.GetAllTopLevelWindows(_automation)
-            .First(w => w.Title == "Settings");
+        var settingsWin = FindSettingsWindow();
+        settingsWin.Should().NotBeNull("the Settings window must open");
 
-        FindByName(settingsWin, "DeleteModeToggle")!.AsToggleButton().Toggle();
+        FindByName(settingsWin!, "DeleteModeToggle")!.AsToggleButton().Toggle();
         Thread.Sleep(ActionDelay);
-        settingsWin.Close();
+        settingsWin!.Close();
         Thread.Sleep(ActionDelay);
 
         // Delete buttons should now be visible
@@ -228,10 +259,10 @@ public sealed class SettingsUITests : IDisposable
         // Clean up: turn off delete mode
         FindByName(window, "SettingsButton")!.AsButton().Invoke();
         Thread.Sleep(SettingsDelay);
-        var sw2 = _app!.GetAllTopLevelWindows(_automation).First(w => w.Title == "Settings");
-        FindByName(sw2, "DeleteModeToggle")!.AsToggleButton().Toggle();
+        var sw2 = FindSettingsWindow();
+        FindByName(sw2!, "DeleteModeToggle")!.AsToggleButton().Toggle();
         Thread.Sleep(ActionDelay);
-        sw2.Close();
+        sw2?.Close();
     }
 
     // ── Transparency slider ───────────────────────────────────────────────────
@@ -246,12 +277,12 @@ public sealed class SettingsUITests : IDisposable
         FindByName(window, "SettingsButton")!.AsButton().Invoke();
         Thread.Sleep(SettingsDelay);
 
-        var settingsWin = _app!.GetAllTopLevelWindows(_automation)
-            .First(w => w.Title == "Settings");
+        var settingsWin = FindSettingsWindow();
+        settingsWin.Should().NotBeNull("the Settings window must open");
 
-        var sliders = settingsWin.FindAllDescendants(x => x.ByControlType(ControlType.Slider));
+        var sliders = settingsWin!.FindAllDescendants(x => x.ByControlType(ControlType.Slider));
         sliders.Should().NotBeEmpty("the settings window must contain an opacity slider");
-        settingsWin.Close();
+        settingsWin?.Close();
     }
 
     [Fact]
@@ -264,14 +295,14 @@ public sealed class SettingsUITests : IDisposable
         FindByName(window, "SettingsButton")!.AsButton().Invoke();
         Thread.Sleep(SettingsDelay);
 
-        var settingsWin = _app!.GetAllTopLevelWindows(_automation)
-            .First(w => w.Title == "Settings");
+        var settingsWin = FindSettingsWindow();
+        settingsWin.Should().NotBeNull("the Settings window must open");
 
-        var texts = AllTexts(settingsWin);
+        var texts = AllTexts(settingsWin!);
         texts.Should().Contain(t => t.EndsWith("%"),
             "the settings window must show a transparency percentage label");
 
-        settingsWin.Close();
+        settingsWin?.Close();
     }
 
     // ── Theme selector ────────────────────────────────────────────────────────
@@ -286,10 +317,10 @@ public sealed class SettingsUITests : IDisposable
         FindByName(window, "SettingsButton")!.AsButton().Invoke();
         Thread.Sleep(SettingsDelay);
 
-        var settingsWin = _app!.GetAllTopLevelWindows(_automation)
-            .First(w => w.Title == "Settings");
+        var settingsWin = FindSettingsWindow();
+        settingsWin.Should().NotBeNull("the Settings window must open");
 
-        var combos = settingsWin.FindAllDescendants(x => x.ByControlType(ControlType.ComboBox));
+        var combos = settingsWin!.FindAllDescendants(x => x.ByControlType(ControlType.ComboBox));
         combos.Should().NotBeEmpty("the settings window must contain at least one ComboBox");
 
         // The first combo is the theme selector
@@ -301,6 +332,6 @@ public sealed class SettingsUITests : IDisposable
         items.Should().HaveCountGreaterThanOrEqualTo(5,
             "the theme selector should have at least 5 themes");
 
-        settingsWin.Close();
+        settingsWin?.Close();
     }
 }

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using System.Windows.Threading;
+using WorldClock.Helpers;
 using WorldClock.Models;
 using WorldClock.Services;
 
@@ -14,12 +15,31 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     // ── Accent palette (cycles for dynamically added cities) ─────────────────
-    private static readonly string[] AccentCycle =
+    /// <summary>Ordered preset accent colours available in the card colour picker.</summary>
+    public static readonly IReadOnlyList<string> AccentPalette =
     [
         "#00E5FF","#FFD600","#00E676","#FF9100",
         "#CE93D8","#FF4081","#69F0AE","#F48FB1",
         "#80DEEA","#FFCC02","#B39DDB","#4DD0E1"
     ];
+
+    /// <summary>Pairs an original palette hex (used for saving/selection) with the
+    /// theme-adjusted brush used for display in the colour picker swatches.</summary>
+    public sealed record AccentEntry(string Hex, SolidColorBrush Display);
+
+    /// <summary>The accent palette entries pre-themed for the active theme.
+    /// In light mode the swatch colours are darkened (same 70 % HSV-Value transform
+    /// as <see cref="ClockLocation.ThemedAccentBrush"/>) so they remain readable.
+    /// Raises <see cref="PropertyChanged"/> automatically when the active theme changes.</summary>
+    public IReadOnlyList<AccentEntry> ThemedAccentPalette =>
+        AccentPalette.Select(hex =>
+        {
+            var color    = (Color)ColorConverter.ConvertFromString(hex);
+            var rawBrush = new SolidColorBrush(color);
+            rawBrush.Freeze();
+            var display  = ThemeColorHelper.ThemedBrush(rawBrush);
+            return new AccentEntry(hex, display);
+        }).ToList();
 
     private int _accentIndex;
 
@@ -88,7 +108,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 if (city.TimeZoneId == "UTC") continue;
                 try   { TimeZoneInfo.FindSystemTimeZoneById(city.TimeZoneId); }
                 catch { continue; }   // timezone removed from OS — skip gracefully
-                Add(city.CityName, city.CountryFlag, city.TimeZoneId, city.TeamLabel);
+                Add(city.CityName, city.CountryFlag, city.TimeZoneId, city.TeamLabel,
+                    string.IsNullOrEmpty(city.AccentHex) ? null : city.AccentHex);
             }
         }
 
@@ -111,6 +132,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             if (e.PropertyName == nameof(ThemeService.ActiveTheme))
             {
                 foreach (var loc in Locations) loc.NotifyThemeChanged();
+                OnPropertyChanged(nameof(ThemedAccentPalette));
                 Translator.BuildGrid();
                 Translator.Translate();
             }
@@ -138,10 +160,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
                             string flag = "🏙️")
     {
         if (string.IsNullOrWhiteSpace(cityName)) return false;
-        if (Locations.Any(l => string.Equals(l.CityName, cityName.Trim(),
-                                             StringComparison.OrdinalIgnoreCase))) return false;
-        // Reject if any existing location already uses the same timezone (same clock, different name)
-        if (Locations.Any(l => string.Equals(l.TimeZoneId, tzId.Trim(),
+        // Normalise "City, State" → "City" (e.g. "New York, New York" → "New York")
+        var comma = cityName.IndexOf(',');
+        cityName = (comma > 0 ? cityName[..comma] : cityName).Trim();
+        if (Locations.Any(l => string.Equals(l.CityName, cityName,
                                              StringComparison.OrdinalIgnoreCase))) return false;
         try   { TimeZoneInfo.FindSystemTimeZoneById(tzId); }
         catch { return false; }
@@ -167,6 +189,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 CountryFlag = l.CountryFlag,
                 TimeZoneId  = l.TimeZoneId,
                 TeamLabel   = l.TeamLabel,
+                AccentHex   = $"#{l.AccentBrush.Color.R:X2}{l.AccentBrush.Color.G:X2}{l.AccentBrush.Color.B:X2}",
             })
             .ToList();
         saved.HomeLocationId = _homeLocationId;
@@ -252,10 +275,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private void Add(string city, string flag, string tzId, string team)
+    private void Add(string city, string flag, string tzId, string team, string? accentHex = null)
     {
-        var hex    = AccentCycle[_accentIndex % AccentCycle.Length];
-        _accentIndex++;
+        var hex = accentHex ?? AccentPalette[_accentIndex % AccentPalette.Count];
+        if (accentHex is null) _accentIndex++;
         var color  = (Color)ColorConverter.ConvertFromString(hex);
         var brush  = new SolidColorBrush(color);
         brush.Freeze();

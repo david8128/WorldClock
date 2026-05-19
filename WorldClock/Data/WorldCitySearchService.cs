@@ -146,6 +146,16 @@ public static class WorldCitySearchService
 
     private static string NKey(string country, string city) => $"{country}|{city}";
 
+    /// <summary>
+    /// Strips a trailing ", Region" or ", State" suffix from airport city names
+    /// (e.g. "New York, New York" → "New York", "Kansas City, Missouri" → "Kansas City").
+    /// </summary>
+    private static string NormalizeCityName(string name)
+    {
+        var comma = name.IndexOf(',');
+        return comma > 0 ? name[..comma].Trim() : name;
+    }
+
     // ── CSV loading ───────────────────────────────────────────────────────────
 
     private static string? FindCsvPath()
@@ -210,7 +220,7 @@ public static class WorldCitySearchService
                 if (p.Length < 11) continue;
 
                 var iana        = p[3].Trim();
-                var cityName    = p[4].Trim();
+                var cityName    = NormalizeCityName(p[4].Trim());
                 var cityCode    = p[5].Trim().ToUpperInvariant();
                 var airportCode = p[1].Trim().ToUpperInvariant();
                 var countryA2   = p[8].Trim();
@@ -247,7 +257,7 @@ public static class WorldCitySearchService
                 if (p.Length < 7) continue;
 
                 var countryCode = p[0].Trim();
-                var cityName    = p[1].Trim();
+                var cityName    = NormalizeCityName(p[1].Trim());
                 var altNames    = p.Length > 3 ? p[3] : "";
                 var iana        = p[6].Trim();
 

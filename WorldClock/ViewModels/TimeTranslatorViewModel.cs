@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using WorldClock.Data;
+using WorldClock.Helpers;
 using WorldClock.Models;
 
 namespace WorldClock.ViewModels;
@@ -25,14 +26,17 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
 
     // ── Core inputs ───────────────────────────────────────────────────────────
     private DateTime?    _date       = DateTime.Today;
-    private string       _hour       = DateTime.Now.Hour.ToString("D2");
-    private string       _minute     = DateTime.Now.Minute.ToString("D2");
-    private TimeZoneInfo _sourceZone = TimeZoneInfo.Utc;
+    // _hour/_minute represent the START of the selected slot in _sourceZone (or _homeZone).
+    // They are overridden in the constructor via SnapSelectionToNow before first BuildGrid.
+    private string       _hour       = DateTime.UtcNow.Hour.ToString("D2");
+    private string       _minute     = (DateTime.UtcNow.Minute >= 30 ? 30 : 0).ToString("D2");
+    private TimeZoneInfo _sourceZone = TimeZoneInfo.Local;
     private TimeZoneInfo? _homeZone;          // home location's timezone (null = not set)
     private bool         _isOpen = true;   // expanded by default
     private bool         _hasExplicitSelection;
-    private int    _selectionStart    = DateTime.Now.Hour * 2;
-    private int    _selectionEnd      = DateTime.Now.Hour * 2;
+    // Slot fields are set correctly by SnapSelectionToNow in the constructor.
+    private int    _selectionStart    = 0;
+    private int    _selectionEnd      = 0;
     private double _currentTimeLeft   = -1.0;
 
     public DateTime? Date
@@ -59,12 +63,15 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         set { if (SetProperty(ref _minute, value)) Translate(); }
     }
 
+    /// <summary>The timezone that drives the column headers: home location tz, or source tz if no home is set.</summary>
+    public TimeZoneInfo EffectiveZone => _homeZone ?? _sourceZone;
+
     public TimeZoneInfo SourceZone
     {
         get => _sourceZone;
         set
         {
-            if (!SetProperty(ref _sourceZone, value ?? TimeZoneInfo.Utc)) return;
+            if (!SetProperty(ref _sourceZone, value ?? TimeZoneInfo.Local)) return;
             BuildGrid();
             Translate();
         }
@@ -74,6 +81,49 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
     {
         get => _isOpen;
         set => SetProperty(ref _isOpen, value);
+    }
+
+    // ── Click diagnostics (last raw mouse-X received by the hit-test border) ─────
+    private double _lastClickPosX      = -1;
+    private double _diagScrollViewerX  = -1;  // GridScrollViewer origin-X in TranslatorResults coords
+    private double _diagOrigSrcX       = -1;  // clicked element origin-X in TranslatorResults coords
+    private double _diagCpCanvasLeft   = -1;  // Canvas.Left of the hit ContentPresenter (= slot * 10)
+    private double _diagCanvas1aX      = -1;  // Layer-1a parent Canvas origin-X in TranslatorResults coords
+
+    /// <summary>Stores the raw pos.X from the last PreviewMouseDown on the grid border.</summary>
+    public double LastClickPosX
+    {
+        get => _lastClickPosX;
+        set { _lastClickPosX = value; OnPropertyChanged(); OnPropertyChanged(nameof(DiagStatus)); }
+    }
+
+    /// <summary>Actual x-origin of GridScrollViewer within the TranslatorResults Border (measured via TransformToAncestor).
+    /// Should be 0 if layout is correct. Non-zero means the scrollviewer is offset.</summary>
+    public double DiagScrollViewerX
+    {
+        get => _diagScrollViewerX;
+        set { _diagScrollViewerX = value; OnPropertyChanged(); OnPropertyChanged(nameof(DiagStatus)); }
+    }
+
+    /// <summary>Actual x-origin of the clicked element within the TranslatorResults Border.</summary>
+    public double DiagOrigSrcX
+    {
+        get => _diagOrigSrcX;
+        set { _diagOrigSrcX = value; OnPropertyChanged(); OnPropertyChanged(nameof(DiagStatus)); }
+    }
+
+    /// <summary>Canvas.Left of the hit ContentPresenter (= its SlotIndex * 10). Negative = not measured.</summary>
+    public double DiagCpCanvasLeft
+    {
+        get => _diagCpCanvasLeft;
+        set { _diagCpCanvasLeft = value; OnPropertyChanged(); OnPropertyChanged(nameof(DiagStatus)); }
+    }
+
+    /// <summary>X-origin of the Layer-1a parent Canvas in TranslatorResults coords. Should be 160.</summary>
+    public double DiagCanvas1aX
+    {
+        get => _diagCanvas1aX;
+        set { _diagCanvas1aX = value; OnPropertyChanged(); OnPropertyChanged(nameof(DiagStatus)); }
     }
 
     // ── Current-time needle (today-only vertical marker) ─────────────────────
@@ -94,6 +144,54 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
 
     /// <summary>True when the current-time needle should be visible in the header.</summary>
     public bool ShowCurrentTime => _currentTimeLeft >= 0;
+
+    /// <summary>
+    /// Real-time debug status string — visible in the UI debug overlay when enabled.
+    /// Format: "srcZone | slot=N | label=Nh:mm | needle=Npx"
+    /// </summary>
+    public string DiagStatus
+    {
+        get
+        {
+            var srcZone = _homeZone ?? _sourceZone;
+            var slotHour  = _selectionStart / 2;
+            var slotMin   = (_selectionStart % 2) * 30;
+            bool pm       = slotHour >= 12;
+            int  h12      = slotHour % 12 == 0 ? 12 : slotHour % 12;
+            var slotLabel = $"{h12}:{slotMin:D2}{(pm ? "pm" : "am")}";
+
+            // Per-cell IsHourSelected for first row — confirms binding is live.
+            // Slots 0,2,4 (even = hour-starts) should show true when selection
+            // overlaps that hour. All odd slots are always false.
+            // Per-cell IsHourSelected around the active selection — shows slots 0,2,8,10,12
+            string cellDbg = "(no rows)";
+            if (Rows.Count > 0 && Rows[0].Cells.Count >= 14)
+            {
+                var c = Rows[0].Cells;
+                cellDbg = $"IHS[0]={c[0].IsHourSelected} IHS[2]={c[2].IsHourSelected} IHS[8]={c[8].IsHourSelected} IHS[10]={c[10].IsHourSelected} IHS[12]={c[12].IsHourSelected}";
+            }
+
+            // Column-header IsHourSelected for slots 0,2,8,10,12
+            string colDbg = "(no cols)";
+            if (Columns.Count >= 14)
+                colDbg = $"col[0].IHS={Columns[0].IsHourSelected} col[2].IHS={Columns[2].IsHourSelected} col[10].IHS={Columns[10].IsHourSelected}";
+
+            // ── Compact first line: the numbers most likely to be truncated last ──
+            string svX    = _diagScrollViewerX >= 0 ? $"{_diagScrollViewerX:F0}" : "?";
+            string srcX   = _diagOrigSrcX      >= 0 ? $"{_diagOrigSrcX:F0}"      : "?";
+            string clkSlot= _lastClickPosX     >= 0 ? $"{(int)((_lastClickPosX - 160) / 10)}" : "?";
+            string clkX   = _lastClickPosX     >= 0 ? $"{_lastClickPosX:F0}"     : "?";
+
+            string cpLeft  = _diagCpCanvasLeft >= 0 ? $"{_diagCpCanvasLeft:F0}" : "?";
+            string canvX   = _diagCanvas1aX    >= 0 ? $"{_diagCanvas1aX:F0}"    : "?";
+            int    hitSlot = _diagCpCanvasLeft >= 0 ? (int)(_diagCpCanvasLeft / 10) : -1;
+
+            return $"sel={_selectionStart}-{_selectionEnd} | {slotLabel} | clk.X={clkX}\u2192slot={clkSlot} | SV.x={svX} | src.x={srcX}\n" +
+                   $"  CP.L={cpLeft}\u2192hitSlot={hitSlot} | canv.X={canvX} | needle={_currentTimeLeft:F0}px\n" +
+                   $"  DataRow: {cellDbg}\n" +
+                   $"  ColHdr : {colDbg}";
+        }
+    }
 
     // ── Selection window (half-hour slot indices 0-47) ───────────────────────
     // Legacy int getter: hour of the selection start (for test compat)
@@ -139,19 +237,34 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         _hasExplicitSelection = true;
 
         // Clear old highlight
-        foreach (var col in Columns)        col.IsSelected = false;
+        foreach (var col in Columns) col.IsSelected = col.IsHourSelected = false;
         foreach (var row in Rows)
-            foreach (var cell in row.Cells) cell.IsSelected = false;
+            foreach (var cell in row.Cells) cell.IsSelected = cell.IsHourSelected = false;
 
         _selectionStart = start;
         _selectionEnd   = end;
 
-        // Apply new highlight
+        // Apply slot-level highlight (drives day-change bar and needle logic)
         for (int i = start; i <= end; i++)
         {
             if (i < Columns.Count) Columns[i].IsSelected = true;
             foreach (var row in Rows)
                 if (i < row.Cells.Count) row.Cells[i].IsSelected = true;
+        }
+
+        // IsHourSelected: an even slot S is hour-selected when the hour it spans
+        // [S, S+1] overlaps the selection [start, end].  Overlap ↔ S+1>=start && S<=end.
+        // Drives the 20px selection highlight (header + data rows) to match the 20px text label.
+        foreach (var col in Columns)
+        {
+            bool hourSel = col.SlotIndex % 2 == 0
+                           && col.SlotIndex + 1 >= start
+                           && col.SlotIndex     <= end;
+            col.IsHourSelected = hourSel;
+            // Mirror to the corresponding cell in every row
+            foreach (var row in Rows)
+                if (col.SlotIndex < row.Cells.Count)
+                    row.Cells[col.SlotIndex].IsHourSelected = hourSel;
         }
 
         UpdateRowDateLabels();
@@ -165,6 +278,7 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         _minute = (start % 2 == 0) ? "00" : "30";
         OnPropertyChanged(nameof(Hour));
         OnPropertyChanged(nameof(Minute));
+        OnPropertyChanged(nameof(DiagStatus));
         Translate();
     }
 
@@ -237,9 +351,8 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
     public void NextDay() => Date = (_date ?? DateTime.Today).AddDays(1);
     public void GoToday()
     {
-        _date           = DateTime.Today;
-        _selectionStart = DateTime.Now.Hour * 2;
-        _selectionEnd   = DateTime.Now.Hour * 2;
+        _date = DateTime.Today;
+        SnapSelectionToNow(EffectiveZone);
         OnPropertyChanged(nameof(Date));
         OnPropertyChanged(nameof(DateLabel));
         OnPropertyChanged(nameof(SelectedHour));
@@ -256,6 +369,9 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         // Keep HasSourceMatches in sync with the collection
         SourceCityMatches.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSourceMatches));
 
+        // Snap selection to now in local timezone before the first render so that
+        // column headers always show local (not UTC) times even before home is set.
+        SnapSelectionToNow(_sourceZone);
         BuildGrid();
         Translate();
     }
@@ -268,8 +384,28 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
     public void SetHomeZone(TimeZoneInfo? tz)
     {
         _homeZone = tz;
+        DiagLog.Info($"SetHomeZone: tz={(tz?.Id ?? "<null>")}, _hasExplicitSelection={_hasExplicitSelection}, effectiveZone={EffectiveZone.Id}");
+        // Snap the default selection to "now" in the new reference zone so the
+        // initial highlight aligns with the needle (both use the same zone).
+        if (!_hasExplicitSelection)
+            SnapSelectionToNow(tz ?? _sourceZone);
         BuildGrid();
         Translate();
+    }
+
+    /// <summary>
+    /// Snaps _selectionStart/_selectionEnd and _hour/_minute to the current time
+    /// in <paramref name="tz"/>, without marking an explicit user selection.
+    /// </summary>
+    private void SnapSelectionToNow(TimeZoneInfo tz)
+    {
+        var now  = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
+        // Snap to the current 30-minute slot (half-hour granularity preserved).
+        var slot = now.Hour * 2 + (now.Minute >= 30 ? 1 : 0);
+        _selectionStart = _selectionEnd = slot;
+        _hour   = (slot / 2).ToString("D2");
+        _minute = slot % 2 == 0 ? "00" : "30";
+        DiagLog.Info($"SnapSelectionToNow: tz={tz.Id}, utcNow={DateTime.UtcNow:HH:mm:ss}, localNow={now:HH:mm:ss}, slot={slot}, _hour={_hour}, _minute={_minute}");
     }
 
     // ── Build transposed grid: columns = 48 half-hour slots, rows = cities ─────
@@ -279,6 +415,7 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         // When a home location is set, its timezone drives the column headers so the
         // home row always "coincides" with (shows the same times as) the header.
         var srcZone = _homeZone ?? _sourceZone;
+        DiagLog.Info($"BuildGrid: date={date:yyyy-MM-dd}, srcZone={srcZone.Id}, _selectionStart={_selectionStart}, _selectionEnd={_selectionEnd}, _hour={_hour}, _minute={_minute}");
 
         // ── Columns: 48 half-hour slots (0 = 00:00 … 47 = 23:30) ────────────
         Columns.Clear();
@@ -290,6 +427,9 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
                 SlotLabel      = s % 2 == 0 ? ToAmPmHour(s / 2) : "",
                 IsHourStart    = s % 2 == 0,
                 IsSelected     = s >= _selectionStart && s <= _selectionEnd,
+                IsHourSelected = s % 2 == 0
+                                 && s + 1 >= _selectionStart
+                                 && s     <= _selectionEnd,
                 IsMidnight     = s == 0,
                 DayOfWeekLabel = s == 0 ? date.ToString("ddd") : "",
                 DateShortLabel = s == 0 ? date.ToString("MMM d") : "",
@@ -323,11 +463,14 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
                 var diffStr = dayDiff > 0 ? $"+{dayDiff}" : "";  // suppress negative offsets
                 utcCells.Add(new TimeGridCell
                 {
-                    SlotIndex  = s,
-                    TimeStr    = utcSlot.ToString("HH:mm"),
-                    DayDiff    = diffStr,
-                    Band       = GetTimeBand(utcSlot.Hour),
-                    IsSelected = s >= _selectionStart && s <= _selectionEnd,
+                    SlotIndex      = s,
+                    TimeStr        = utcSlot.ToString("HH:mm"),
+                    DayDiff        = diffStr,
+                    Band           = GetTimeBand(utcSlot.Hour),
+                    IsSelected     = s >= _selectionStart && s <= _selectionEnd,
+                    IsHourSelected = s % 2 == 0
+                                     && s + 1 >= _selectionStart
+                                     && s     <= _selectionEnd,
                 });
             }
             var utcSelCell = utcCells[Math.Min(_selectionStart, 47)];
@@ -383,11 +526,14 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
 
                 cells.Add(new TimeGridCell
                 {
-                    SlotIndex  = s,
-                    TimeStr    = local.ToString("HH:mm"),
-                    DayDiff    = diffStr,
-                    Band       = GetTimeBand(local.Hour),
-                    IsSelected = s >= _selectionStart && s <= _selectionEnd,
+                    SlotIndex      = s,
+                    TimeStr        = local.ToString("HH:mm"),
+                    DayDiff        = diffStr,
+                    Band           = GetTimeBand(local.Hour),
+                    IsSelected     = s >= _selectionStart && s <= _selectionEnd,
+                    IsHourSelected = s % 2 == 0
+                                     && s + 1 >= _selectionStart
+                                     && s     <= _selectionEnd,
                 });
             }
 
@@ -413,6 +559,16 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
 
         // Stamp the current-time needle position on every row
         RefreshCurrentTime();
+        // Log cell text at slots 0 and 10 for the first row to verify alignment
+        if (Rows.Count > 0)
+        {
+            var r0 = Rows[0];
+            var c0  = r0.Cells[0].TimeStr;
+            var c10 = r0.Cells.Count > 10 ? r0.Cells[10].TimeStr : "n/a";
+            var p0  = r0.Cells[0].TimeAmPm;
+            var p10 = r0.Cells.Count > 10 ? r0.Cells[10].TimeAmPm : "n/a";
+            DiagLog.Info($"BuildGrid done: Row[0]={r0.CityName}, cell[0]={c0}/{p0}, cell[10]={c10}/{p10}");
+        }
     }
 
     // ── Point-in-time translation (populates Results) ─────────────────────────
@@ -432,7 +588,7 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         try   { utc = TimeZoneInfo.ConvertTimeToUtc(input, srcZone); }
         catch { utc = TimeZoneInfo.ConvertTimeToUtc(input.AddHours(1), srcZone); }
 
-        // Compute selection-end UTC for the window end time shown in cards.
+        DiagLog.Info($"Translate: srcZone={srcZone.Id}, _hour={_hour}, _minute={_minute}, input={input:HH:mm}, utc={utc:HH:mm}, _selectionStart={_selectionStart}, SelectionWindowLabel={SelectionWindowLabel}");
         // The end of the selection is the START of slot (selectionEnd + 1).
         bool hasRange   = _selectionEnd > _selectionStart;
         int  endSlot    = _selectionEnd + 1;
@@ -480,6 +636,7 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
             row.HasRange           = hasRange;
             row.IsDst              = tz.IsDaylightSavingTime(utcDto);
             row.ShowTranslatedTime = _hasExplicitSelection;
+            DiagLog.Debug($"  Row[{loc.CityName}] tz={tz.Id}, utc={utc:HH:mm} → local={local:HH:mm}, SelectedTimeStr={row.SelectedTimeStr}");
         }
 
         Results.Clear();
@@ -528,11 +685,37 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
 
     // ── Current-time needle helpers ────────────────────────────────────────
 
+    // ── Teams meeting deep link ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds the msteams:// and https:// fallback URIs for the current selection,
+    /// using per-row translated times from the grid.
+    /// </summary>
+    public (string TeamsUri, string BrowserUri) BuildTeamsDeepLink()
+    {
+        var date = _date ?? DateTime.Today;
+
+        // Collect city times from every row that has a translated time
+        var cityTimes = Rows
+            .Where(r => r.SelectedTimeStr != null)
+            .Select(r =>
+            (
+                r.CityName,
+                r.SelectedTimeStr ?? "",
+                r.SelectedEndTimeStr ?? r.SelectedTimeStr ?? ""
+            ))
+            .ToList();
+
+        return Helpers.TeamsDeepLinkBuilder.Build(date, _selectionStart, _selectionEnd, cityTimes);
+    }
+
+    // ── Current-time needle helpers ───────────────────────────────────────────
+
     /// <summary>
     /// Computes the pixel offset from the visualizer's left edge to "now" in the
     /// reference timezone (home tz, or source tz if no home is set).
     /// Returns -1 when the viewed date is not today.
-    /// Row header = 160 px, each 30-min slot = 14 px.
+    /// Row header = 160 px, each 30-min slot = 10 px.
     /// </summary>
     private double ComputeCurrentTimeLeft()
     {
@@ -540,7 +723,9 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
         var refZone  = _homeZone ?? _sourceZone;
         var now      = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, refZone);
         double slots = now.Hour * 2.0 + now.Minute / 30.0;  // fractional slot index
-        return 160.0 + slots * 14.0;                         // 160 = row-header width px
+        double left  = 160.0 + slots * 10.0;                 // 160 = row-header width px
+        DiagLog.Debug($"ComputeCurrentTimeLeft: refZone={refZone.Id}, now={now:HH:mm:ss}, slots={slots:F2}, left={left:F1}px");
+        return left;
     }
 
     /// <summary>

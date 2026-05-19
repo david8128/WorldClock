@@ -32,4 +32,6 @@ public sealed class SavedCity
     public string CountryFlag { get; set; } = string.Empty;
     public string TimeZoneId  { get; set; } = string.Empty;
     public string TeamLabel   { get; set; } = string.Empty;
+    /// <summary>Hex accent colour, e.g. "#00E5FF". Empty = use auto-assigned palette colour.</summary>
+    public string AccentHex   { get; set; } = string.Empty;
 }
