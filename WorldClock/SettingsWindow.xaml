@@ -561,6 +561,56 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- STARTUP -->
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}" Text="🚀  STARTUP"/>
+                            <TextBlock FontSize="11" Foreground="{DynamicResource BrushTextDim}"
+                                       Margin="0,0,0,10" TextWrapping="Wrap">
+                                Automatically launch WorldClock when you sign in to Windows.
+                            </TextBlock>
+                            <ToggleButton x:Name="StartupToggle"
+                                          Content="Start on Login: OFF"
+                                          Padding="16,7" FontSize="13"
+                                          HorizontalAlignment="Left"
+                                          AutomationProperties.Name="StartupToggle"
+                                          Checked="StartupToggle_Checked"
+                                          Unchecked="StartupToggle_Unchecked">
+                                <ToggleButton.Style>
+                                    <Style TargetType="ToggleButton">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ToggleButton">
+                                                    <Border x:Name="Bd"
+                                                            Background="{DynamicResource BrushBackgroundMid}"
+                                                            BorderBrush="{DynamicResource BrushSeparator}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="6"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background" Value="#00695C"/>
+                                                            <Setter TargetName="Bd" Property="BorderBrush"  Value="#00695C"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+                                        <Setter Property="Cursor"     Value="Hand"/>
+                                    </Style>
+                                </ToggleButton.Style>
+                            </ToggleButton>
+                            <!-- Live registry status line -->
+                            <TextBlock x:Name="StartupStatusLabel"
+                                       FontSize="10" FontFamily="Consolas"
+                                       Margin="0,8,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
                     <!-- DIAGNOSTICS -->
                     <Border Style="{StaticResource SectionCard}">
                         <StackPanel>

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 using WorldClock.Data;
 using WorldClock.Helpers;
 using WorldClock.Models;
@@ -52,6 +53,10 @@ public partial class SettingsWindow : Window
         DiagnosticsToggle.IsChecked = _theme.ShowDiagnostics;
         UpdateDiagnosticsToggleContent();
 
+        // Startup toggle sync — read live registry state so external changes are reflected
+        StartupToggle.IsChecked = _theme.RunOnStartup;
+        UpdateStartupToggleContent();
+
         // Placeholder visibility
         CityNameBox.TextChanged  += (_, _) => CityNamePlaceholder.Visibility =
             string.IsNullOrEmpty(CityNameBox.Text) ? Visibility.Visible : Visibility.Collapsed;
@@ -78,6 +83,12 @@ public partial class SettingsWindow : Window
         {
             _theme.ActiveTheme = selected;
             UpdateAddCityButtonColor();
+            // Re-apply acrylic with the new theme's background colour
+            if (IsLoaded)
+            {
+                var alpha = AcrylicHelper.ToTintAlpha(_theme.Opacity);
+                AcrylicHelper.Enable(this, selected.BackgroundDark, alpha, selected.IsDark);
+            }
         }
     }
 
@@ -393,6 +404,53 @@ public partial class SettingsWindow : Window
         DiagnosticsToggle.Content = _theme.ShowDiagnostics
             ? "Diagnostics Window: ON"
             : "Diagnostics Window: OFF";
+    }
+
+    // Startup toggle
+    private void StartupToggle_Checked(object sender, RoutedEventArgs e)
+    {
+        _theme.RunOnStartup = true;
+        UpdateStartupToggleContent();
+    }
+
+    private void StartupToggle_Unchecked(object sender, RoutedEventArgs e)
+    {
+        _theme.RunOnStartup = false;
+        UpdateStartupToggleContent();
+    }
+
+    private void UpdateStartupToggleContent()
+    {
+        if (StartupToggle == null) return;
+        StartupToggle.Content = _theme.RunOnStartup ? "Start on Login: ON" : "Start on Login: OFF";
+
+        if (StartupStatusLabel == null) return;
+
+        bool liveActive = StartupHelper.IsRegistered;
+        bool intended   = _theme.RunOnStartup;
+
+        if (intended && liveActive)
+        {
+            StartupStatusLabel.Text       = "✓ Active — WorldClock will launch at Windows login";
+            StartupStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0xBB, 0x6A));
+        }
+        else if (!intended && !liveActive)
+        {
+            StartupStatusLabel.Text       = "✗ Inactive — WorldClock will not launch at login";
+            StartupStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
+        }
+        else if (intended && !liveActive)
+        {
+            // Toggle ON but registry entry is missing (e.g. removed externally or first write failed)
+            StartupStatusLabel.Text       = "⚠ Registry entry missing — try toggling off then on again";
+            StartupStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xA7, 0x26));
+        }
+        else
+        {
+            // Toggle OFF but registry entry still exists (e.g. added externally)
+            StartupStatusLabel.Text       = "⚠ Registry entry exists externally — toggle ON then OFF to remove";
+            StartupStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xA7, 0x26));
+        }
     }
 
     // Close

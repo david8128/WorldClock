@@ -26,6 +26,13 @@ public sealed class UserSettings
 
     /// <summary>When true, the diagnostics/debug window is shown. Default false.</summary>
     public bool ShowDiagnostics { get; set; } = false;
+
+    /// <summary>
+    /// When true the app is registered in HKCU\...\Run to launch automatically at Windows login.
+    /// The authoritative live state is the registry itself; this field is the user's <em>intent</em>
+    /// and is kept in sync by <see cref="Services.ThemeService"/>.
+    /// </summary>
+    public bool RunOnStartup { get; set; } = false;
 }
 
 /// <summary>Minimal data needed to reconstruct a <see cref="ClockLocation"/>.</summary>

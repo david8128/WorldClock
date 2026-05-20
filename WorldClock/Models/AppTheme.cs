@@ -50,6 +50,8 @@ public sealed class AppTheme
         }
     }
 
+    public override string ToString() => Name;
+
     private static SolidColorBrush Freeze(SolidColorBrush b) { b.Freeze(); return b; }
 
     // ── Built-in themes ───────────────────────────────────────────────────────

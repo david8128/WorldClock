@@ -23,10 +23,12 @@ public sealed class ThemeService : INotifyPropertyChanged
         // Restore persisted theme and opacity on first access.
         // Guard: unit-test processes have no AppData path concerns, Load() returns defaults safely.
         var saved = SettingsService.Instance.Load();
-        _theme          = AppTheme.All.FirstOrDefault(t => t.Name == saved.ThemeName) ?? AppTheme.All[0];
-        _opacity        = Math.Clamp(saved.Opacity, 0.1, 1.0);  // always honour the last saved value
-        _scaleMode      = saved.ScaleMode;
+        _theme           = AppTheme.All.FirstOrDefault(t => t.Name == saved.ThemeName) ?? AppTheme.All[0];
+        _opacity         = Math.Clamp(saved.Opacity, 0.1, 1.0);  // always honour the last saved value
+        _scaleMode       = saved.ScaleMode;
         _showDiagnostics = saved.ShowDiagnostics;
+        // Use the live registry state as the source of truth so external changes are reflected.
+        _runOnStartup    = StartupHelper.IsRegistered;
     }
 
     // ── Active theme ──────────────────────────────────────────────────────────
@@ -83,6 +85,23 @@ public sealed class ThemeService : INotifyPropertyChanged
         get => _editMode;
         set { _editMode = value; OnPropertyChanged(); }
     }
+    // ── Run on startup toggle (persisted to registry + settings.json) ─────────
+
+    private bool _runOnStartup;
+
+    public bool RunOnStartup
+    {
+        get => _runOnStartup;
+        set
+        {
+            if (_runOnStartup == value) return;
+            _runOnStartup = value;
+            OnPropertyChanged();
+            StartupHelper.SetStartup(value);
+            Persist();
+        }
+    }
+
     // ── Diagnostics window toggle ─────────────────────────────────────────────
 
     private bool _showDiagnostics;
@@ -136,6 +155,9 @@ public sealed class ThemeService : INotifyPropertyChanged
         var glowOpacity = _theme.IsDark ? 0.7 : 0.0;
         res["GlowOpacity"]        = glowOpacity;
         res["GlowOpacitySubtle"]  = _theme.IsDark ? 0.35 : 0.0;
+        // White stroke glow for emoji icons (country flag, UTC globe, world clock globe).
+        // Higher opacity than GlowOpacitySubtle so the stroke is clearly visible on dark.
+        res["IconGlowOpacity"]    = _theme.IsDark ? 0.9 : 0.0;
         res["CardShadowOpacity"]  = _theme.IsDark ? 0.55 : 0.20;
         // Card shadow color: dark for light themes, black for dark themes
         var shadowColor = _theme.IsDark
@@ -234,6 +256,7 @@ public sealed class ThemeService : INotifyPropertyChanged
         saved.Opacity         = _opacity;
         saved.ScaleMode       = _scaleMode;
         saved.ShowDiagnostics = _showDiagnostics;
+        saved.RunOnStartup    = _runOnStartup;
         SettingsService.Instance.Save(saved);
     }
 }

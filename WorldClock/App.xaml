@@ -37,6 +37,9 @@
         <!-- ThemeService.Apply() overwrites these at runtime -->
         <sys:Double x:Key="GlowOpacity">0.7</sys:Double>
         <sys:Double x:Key="GlowOpacitySubtle">0.35</sys:Double>
+        <!-- White stroke glow for emoji icons (country flag, UTC globe, world clock globe) -->
+        <!-- 0.9 on dark themes, 0.0 on light themes — set by ThemeService.Apply() -->
+        <sys:Double x:Key="IconGlowOpacity">0.9</sys:Double>
         <sys:Double x:Key="CardShadowOpacity">0.55</sys:Double>
 
         <!-- DST active badge color: bright yellow (dark) / readable amber (light) -->

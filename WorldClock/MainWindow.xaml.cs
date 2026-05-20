@@ -25,12 +25,12 @@ public partial class MainWindow : Window
     private DiagnosticsWindow? _diagWindow;
 
     // ── Auto-resize constants ─────────────────────────────────────────────────
-    // DesignRoot is 1860×760. The Viewbox scales it uniformly to fill the window.
-    // We grow DesignRoot.Height beyond the 760 baseline when clock count exceeds
+    // DesignRoot is 1860×796. The Viewbox scales it uniformly to fill the window.
+    // We grow DesignRoot.Height beyond the 796 baseline when clock count exceeds
     // the threshold that comfortably fits within the baseline height, then resize
     // the window proportionally so the scale factor stays the same.
     private const double DesignWidth         = 1860.0;  // fixed — never changes
-    private const double BaseDesignHeight    =  760.0;  // baseline for ≤ threshold clocks
+    private const double BaseDesignHeight    =  796.0;  // baseline for ≤ threshold clocks
     private const double ClockCardDesignH    =   72.0;  // one clock card in design units
     private const int    ClockCountThreshold =    8;    // clocks that fit in the baseline
 
@@ -169,7 +169,7 @@ public partial class MainWindow : Window
             // Scale proportionally but stop at half the design size; scrollbars below that.
             ScaleViewbox.Stretch = Stretch.Uniform;
             DesignRoot.MinWidth  = 550;   // half of 1100
-            DesignRoot.MinHeight = 380;   // half of 760
+            DesignRoot.MinHeight = 398;   // half of 796
             ScaleScrollViewer.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
             ScaleScrollViewer.VerticalScrollBarVisibility   = ScrollBarVisibility.Auto;
         }
