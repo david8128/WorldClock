@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Threading;
 using FlaUI.Core;
@@ -20,7 +21,7 @@ public sealed class SettingsUITests : IDisposable
         Path.Combine(
             AppContext.BaseDirectory,
             "..", "..", "..", "..",
-            "WorldClock", "bin", "Debug", "net8.0-windows", "WorldClock.exe"));
+            "WorldClock", "bin", "Release", "net8.0-windows", "WorldClock.exe"));
 
     private static readonly TimeSpan StartupDelay  = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan ActionDelay   = TimeSpan.FromMilliseconds(600);
@@ -56,13 +57,9 @@ public sealed class SettingsUITests : IDisposable
     private void SkipIfNoApp()
     {
         if (!_appAvailable)
-        {
-            var msg = $"WorldClock.exe not found — build the main project first. Path: {AppExePath}";
-            // Xunit.Sdk.SkipException ctor signature differs between reference and runtime assemblies.
-            // Use reflection to create it so the correct runtime constructor is called.
-            var ex = (Exception)Activator.CreateInstance(typeof(Xunit.Sdk.SkipException), msg)!;
-            throw ex;
-        }
+            throw new InvalidOperationException(
+                $"[SKIP] WorldClock.exe not found at: {AppExePath}\n" +
+                "Run: dotnet build WorldClock/WorldClock.csproj -c Release");
     }
 
     private static AutomationElement? FindByName(AutomationElement root, string name) =>
@@ -251,9 +248,19 @@ public sealed class SettingsUITests : IDisposable
         settingsWin!.Close();
         Thread.Sleep(ActionDelay);
 
-        // Delete buttons should now be visible
-        window = GetWindow();
-        var deleteButtonsAfter = window.FindAllDescendants(x => x.ByName("DeleteCityButton"));
+        // Delete buttons should now be visible.
+        // Poll for up to 3 s: the WPF DataTrigger fires on the UI-thread dispatcher
+        // and the UIA structural-change notification is asynchronous, so a single
+        // fixed sleep is not reliably sufficient.
+        AutomationElement[] deleteButtonsAfter = [];
+        var deadline = DateTime.Now.AddSeconds(3);
+        do
+        {
+            Thread.Sleep(300);
+            window = GetWindow();
+            deleteButtonsAfter = window.FindAllDescendants(x => x.ByName("DeleteCityButton"));
+        } while (deleteButtonsAfter.Length == 0 && DateTime.Now < deadline);
+
         deleteButtonsAfter.Should().NotBeEmpty("delete buttons must appear after enabling delete mode");
 
         // Clean up: turn off delete mode

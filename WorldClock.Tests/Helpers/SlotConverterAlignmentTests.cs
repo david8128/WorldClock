@@ -21,7 +21,7 @@ namespace WorldClock.Tests.Helpers;
 ///             local time, not UTC.  Fixed by changing the field initializer
 ///             from TimeZoneInfo.Utc to TimeZoneInfo.Local.
 ///
-///   Axis 2 – Converter constant (SlotWidthPx = 10.0): ALL four XAML layers
+///   Axis 2 – Converter constant (SlotWidthPx = 24.0): ALL four XAML layers
 ///             (column-header selection boxes, column-header labels, cell
 ///             backgrounds, and cell labels) compute Canvas.Left via the same
 ///             SlotIndexToCanvasLeftConverter. If this constant drifts from the
@@ -29,11 +29,11 @@ namespace WorldClock.Tests.Helpers;
 ///
 ///   Axis 3 – Code-behind constants (RowHeaderWidth, SlotCellWidth): the click
 ///             handler subtracts RowHeaderWidth before dividing by SlotCellWidth.
-///             These must match the XAML's 160px row-header Border and the
+///             These must match the XAML's 345px row-header Border and the
 ///             converter's SlotWidthPx respectively.
 ///
 /// The needle also uses the formula:
-///   Canvas.Left = 160 + (hour * 2 + minute / 30.0) * 10
+///   Canvas.Left = 345 + (hour * 2 + minute / 30.0) * 24
 /// which is computed in ComputeCurrentTimeLeft() and matches the same constants.
 ///
 /// These tests make the invariants machine-checkable so any future constant
@@ -44,13 +44,13 @@ public sealed class SlotConverterAlignmentTests
     // ── Axis 2: SlotIndexToCanvasLeftConverter pixel positions ────────────────
 
     [Theory]
-    [InlineData(0,  0.0)]    // slot 0  → midnight (left edge of canvas)
-    [InlineData(1,  10.0)]   // slot 1  → 00:30
-    [InlineData(2,  20.0)]   // slot 2  → 01:00
-    [InlineData(10, 100.0)]  // slot 10 → 05:00  (was "5am appearing at 12am column")
-    [InlineData(20, 200.0)]  // slot 20 → 10:00
-    [InlineData(30, 300.0)]  // slot 30 → 15:00  (3pm Colombia in original bug)
-    [InlineData(47, 470.0)]  // slot 47 → 23:30  (last slot)
+    [InlineData(0,    0.0)]   // slot 0  → midnight (left edge of canvas)
+    [InlineData(1,   24.0)]   // slot 1  → 00:30
+    [InlineData(2,   48.0)]   // slot 2  → 01:00
+    [InlineData(10, 240.0)]   // slot 10 → 05:00  (was "5am appearing at 12am column")
+    [InlineData(20, 480.0)]   // slot 20 → 10:00
+    [InlineData(30, 720.0)]   // slot 30 → 15:00  (3pm Colombia in original bug)
+    [InlineData(47, 1128.0)]  // slot 47 → 23:30  (last slot)
     public void Converter_SlotToPixel_ReturnsCorrectCanvasLeft(int slot, double expectedPx)
     {
         var converter = new SlotIndexToCanvasLeftConverter();
@@ -65,9 +65,9 @@ public sealed class SlotConverterAlignmentTests
     public void Converter_SlotWidthPx_IsExactlyTen()
     {
         // This is the single constant that drives ALL four XAML canvas layers.
-        // It must match MainWindow.xaml.cs SlotCellWidth = 10 and the XAML
-        // Border Width="10" for each cell in the data rows.
-        SlotIndexToCanvasLeftConverter.SlotWidthPx.Should().Be(10.0,
+        // It must match MainWindow.xaml.cs SlotCellWidth = 24 and the XAML
+        // Border Width="24" for each cell in the data rows.
+        SlotIndexToCanvasLeftConverter.SlotWidthPx.Should().Be(24.0,
             "SlotWidthPx drives Canvas.Left for column headers AND cell backgrounds. " +
             "Changing it without updating XAML Border widths causes visual misalignment.");
     }
@@ -88,27 +88,27 @@ public sealed class SlotConverterAlignmentTests
 
     // ── Axis 3: Click-to-slot formula agrees with converter ───────────────────
     // The code-behind uses: slot = (posX - RowHeaderWidth) / SlotCellWidth
-    // These constants must equal: RowHeaderWidth=160, SlotCellWidth=SlotWidthPx=10
+    // These constants must equal: RowHeaderWidth=345, SlotCellWidth=SlotWidthPx=24
 
     [Fact]
     public void ClickFormula_AtSlotBoundaries_ProducesCorrectSlot()
     {
         // Reproduce MainWindow.xaml.cs GetSlotFromPosition() without depending on
-        // that private method.  The XAML has a 160px row-header border so:
-        //   slot = Math.Clamp((int)((posX - 160) / 10), 0, 47)
+        // that private method.  The XAML has a 345px row-header border so:
+        //   slot = Math.Clamp((int)((posX - 345) / 24), 0, 47)
 
-        const double rowHeaderWidth = 160.0;  // must equal XAML Border Width="160"
-        const double slotWidthPx    = SlotIndexToCanvasLeftConverter.SlotWidthPx;  // 10.0
+        const double rowHeaderWidth = 345.0;  // must equal XAML Border Width="345"
+        const double slotWidthPx    = SlotIndexToCanvasLeftConverter.SlotWidthPx;  // 24.0
 
         var cases = new (double posX, int expectedSlot)[]
         {
-            (160.0, 0),   // left edge of slot 0
-            (169.9, 0),   // right edge of slot 0 (just before slot 1)
-            (170.0, 1),   // left edge of slot 1
-            (260.0, 10),  // slot 10 = 05:00 (was misaligned with srcZone=UTC)
-            (460.0, 30),  // slot 30 = 15:00 Colombia
-            (630.0, 47),  // slot 47 = 23:30 (last slot)
-            (640.0, 47),  // beyond last slot → clamped to 47
+            (345.0,  0),   // left edge of slot 0
+            (368.9,  0),   // right edge of slot 0 (just before slot 1)
+            (369.0,  1),   // left edge of slot 1
+            (585.0, 10),   // slot 10 = 05:00 (was misaligned with srcZone=UTC)
+            (1065.0, 30),  // slot 30 = 15:00 Colombia
+            (1473.0, 47),  // slot 47 = 23:30 (last slot)
+            (1500.0, 47),  // beyond last slot → clamped to 47
         };
 
         foreach (var (posX, expected) in cases)
@@ -120,8 +120,8 @@ public sealed class SlotConverterAlignmentTests
     }
 
     // ── Axis 1 + Axis 2 combined: needle formula vs selection slot ────────────
-    // The current-time needle uses: Canvas.Left = 160 + slots * 10
-    // A selection at slot S is displayed at: 160px border + S * 10px
+    // The current-time needle uses: Canvas.Left = 345 + slots * 24
+    // A selection at slot S is displayed at: 345px border + S * 24px
     // They must produce the same pixel when slots == S (integer slot index).
 
     [Theory]
@@ -134,14 +134,14 @@ public sealed class SlotConverterAlignmentTests
         // Selection highlight position (column header Canvas.Left + RowHeader offset):
         var converter = new SlotIndexToCanvasLeftConverter();
         var canvasLeft = (double)converter.Convert(slot, typeof(double), null, CultureInfo.InvariantCulture)!;
-        double selectionPixel = 160.0 + canvasLeft;  // 160px row header + canvas offset
+        double selectionPixel = 345.0 + canvasLeft;  // 345px row header + canvas offset
 
         // Needle formula (from ComputeCurrentTimeLeft in TimeTranslatorViewModel):
         //   double slots = hour * 2.0 + minute / 30.0
-        //   double left  = 160.0 + slots * 10.0
+        //   double left  = 345.0 + slots * 24.0
         double hour   = slot / 2;
         double minute = (slot % 2) * 30;
-        double needlePixel = 160.0 + (hour * 2.0 + minute / 30.0) * 10.0;
+        double needlePixel = 345.0 + (hour * 2.0 + minute / 30.0) * 24.0;
 
         needlePixel.Should().Be(selectionPixel,
             $"at slot {slot} the needle Canvas.Left must equal the selection highlight position " +
@@ -198,19 +198,19 @@ public sealed class SlotConverterAlignmentTests
     //   Layer 1 (bottom, clickable):  must also be 20px per hour so the highlight
     //                                 exactly covers the label it belongs to.
     //
-    // With 10px-wide selection cells (one per slot), a single-slot click produces
-    // a 10px highlight that covers only the LEFT HALF of the 20px "12am" label.
-    // The fix: Layer 1 uses 20px cells bound to IsHourSelected (not IsSelected),
+    // With 24px-wide selection cells (one per slot), a single-slot click produces
+    // a 24px highlight that covers only the LEFT HALF of the 48px "12am" label.
+    // The fix: Layer 1 uses 48px cells bound to IsHourSelected (not IsSelected),
     // which is true when EITHER the :00 or the :30 slot of that hour is selected.
 
     [Fact]
     public void ColumnHeader_LabelWidth_Is_Exactly_TwoSlots()
     {
-        // Verifies the constant in XAML: Layer-2 border Width="20"
-        const double labelWidthPx = 20.0;
+        // Verifies the constant in XAML: Layer-2 border Width="48"
+        const double labelWidthPx = 48.0;
         labelWidthPx.Should().Be(
             2 * SlotIndexToCanvasLeftConverter.SlotWidthPx,
-            "each column-header hour label is 20px = 2 × SlotWidthPx, " +
+            "each column-header hour label is 48px = 2 × SlotWidthPx, " +
             "spanning the :00 slot and the :30 slot of the same hour");
     }
 

@@ -190,8 +190,7 @@
                                         SmallChange="0.05" LargeChange="0.10"
                                         TickFrequency="0.05" IsSnapToTickEnabled="True"
                                         Foreground="{DynamicResource BrushAccentCyan}"
-                                        VerticalAlignment="Center"
-                                        ValueChanged="OpacitySlider_ValueChanged"/>
+                                        VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="1"
                                            x:Name="OpacityLabel"
                                            TextAlignment="Right"

@@ -18,18 +18,18 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _headerTimer;
     private readonly DispatcherTimer _globalSearchTimer = new();
 
-    private const int RowHeaderWidth = 310;
-    private const int SlotCellWidth   = 10;  // must match SlotIndexToCanvasLeftConverter.SlotWidthPx
+    private const int RowHeaderWidth = 345;
+    private const int SlotCellWidth   = 24;  // must match SlotIndexToCanvasLeftConverter.SlotWidthPx
     private bool _isDragging;
     private int  _dragStartSlot;
     private DiagnosticsWindow? _diagWindow;
 
     // ── Auto-resize constants ─────────────────────────────────────────────────
-    // DesignRoot is 1100×760. The Viewbox scales it uniformly to fill the window.
+    // DesignRoot is 1860×760. The Viewbox scales it uniformly to fill the window.
     // We grow DesignRoot.Height beyond the 760 baseline when clock count exceeds
     // the threshold that comfortably fits within the baseline height, then resize
     // the window proportionally so the scale factor stays the same.
-    private const double DesignWidth         = 1100.0;  // fixed — never changes
+    private const double DesignWidth         = 1860.0;  // fixed — never changes
     private const double BaseDesignHeight    =  760.0;  // baseline for ≤ threshold clocks
     private const double ClockCardDesignH    =   72.0;  // one clock card in design units
     private const int    ClockCountThreshold =    8;    // clocks that fit in the baseline

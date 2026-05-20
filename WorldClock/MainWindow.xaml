@@ -7,7 +7,7 @@
         xmlns:helpers="clr-namespace:WorldClock.Helpers"
         xmlns:vm="clr-namespace:WorldClock.ViewModels"
         mc:Ignorable="d"
-        Title="World Clock" Icon="Images/Logo.ico" Height="760" Width="1100"
+        Title="World Clock" Icon="Images/Logo.ico" Height="760" Width="1860"
         MinHeight="300" MinWidth="430"
         Background="Transparent"
         AllowsTransparency="True"
@@ -136,7 +136,7 @@
         <!-- Stretch="Uniform" scales the 1100×760 design to fit any window size -->
         <Viewbox x:Name="ScaleViewbox" Stretch="Uniform">
             <Grid x:Name="DesignRoot"
-                  Width="1100" Height="760">
+                  Width="1860" Height="760">
 
     <!-- Root: semi-transparent so the acrylic blur shows through when opacity < 1 -->
     <Border Background="{DynamicResource BrushBackgroundDark}">
@@ -871,14 +871,14 @@
                                                  Foreground="{DynamicResource BrushTextPrimary}"
                                                  FontSize="17" CaretBrush="{DynamicResource BrushAccentCyan}"
                                                  VerticalContentAlignment="Center"
-                                                 ToolTip="Type a city or country to add it to the timeline"
+                                                 ToolTip="Type a city, country, code or UTC offset (e.g. +5:30) to add it to the timeline"
                                                  AutomationProperties.Name="AddCitySearch"
                                                  GotFocus="GlobalCitySearch_GotFocus"
                                                  TextChanged="GlobalCitySearch_TextChanged"
                                                  PreviewKeyDown="GlobalCitySearch_KeyDown"
                                                  LostFocus="GlobalCitySearch_LostFocus"/>
                                         <TextBlock x:Name="GlobalCitySearchPlaceholder"
-                                                   Text="Add a city to the timeline…"
+                                                   Text="City, country, code or UTC offset (e.g. +5:30)…"
                                                    IsHitTestVisible="False" VerticalAlignment="Center"
                                                    Opacity="0.4" FontSize="17"
                                                    Foreground="{DynamicResource BrushTextPrimary}"/>
@@ -1110,7 +1110,7 @@
                                                  All 48 slots are always visible; each lights up via IsSelected
                                                  when that individual 30-min slot is within the selection range. -->
                                             <StackPanel Orientation="Horizontal">
-                                                <Border Width="310" Background="{DynamicResource BrushBackgroundMid}"/>
+                                                <Border Width="345" Background="{DynamicResource BrushBackgroundMid}"/>
                                                 <ItemsControl ItemsSource="{Binding Translator.Columns}">
                                                     <ItemsControl.ItemContainerStyle>
                                                         <Style TargetType="ContentPresenter">
@@ -1120,13 +1120,13 @@
                                                     </ItemsControl.ItemContainerStyle>
                                                     <ItemsControl.ItemsPanel>
                                                         <ItemsPanelTemplate>
-                                                            <Canvas Width="480" Height="36"/>
+                                                            <Canvas Width="1152" Height="36"/>
                                                         </ItemsPanelTemplate>
                                                     </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <!-- Width=10 covers exactly one 30-min slot. -->
-                                                            <Border Width="10" Height="36" Cursor="Hand">
+                                                            <!-- Width=20 covers exactly one 30-min slot. -->
+                                                            <Border Width="24" Height="36" Cursor="Hand">
                                                                 <Border.Style>
                                                                     <Style TargetType="Border">
                                                                         <Setter Property="Visibility" Value="Visible"/>
@@ -1144,7 +1144,7 @@
                                                 </ItemsControl>
                                             </StackPanel>
                                             <!-- Layer 2: hour labels (40px per pair, on top via Grid Z-order, hit-test transparent) -->
-                                            <ItemsControl ItemsSource="{Binding Translator.Columns}" Margin="310,0,0,0"
+                                            <ItemsControl ItemsSource="{Binding Translator.Columns}" Margin="345,0,0,0"
                                                           IsHitTestVisible="False">
                                                 <ItemsControl.ItemContainerStyle>
                                                     <Style TargetType="ContentPresenter">
@@ -1154,16 +1154,16 @@
                                                 </ItemsControl.ItemContainerStyle>
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate>
-                                                        <Canvas Width="480" Height="36" HorizontalAlignment="Left"/>
+                                                        <Canvas Width="1152" Height="36" HorizontalAlignment="Left"/>
                                                     </ItemsPanelTemplate>
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <!-- Width=20 spans exactly the :00 slot (10px) and the :30 slot (10px)
+                                                        <!-- Width=40 spans exactly the :00 slot (20px) and the :30 slot (20px)
                                                              of each hour pair.  Height=36 matches the header row so the inner
                                                              Grid's VerticalAlignment=Center works over the full header height.
                                                              Collapsed for :30 slots (DesiredSize=0, no rendering). -->
-                                                        <Border Width="20" Height="36" Background="Transparent">
+                                                        <Border Width="48" Height="36" Background="Transparent">
                                                             <Border.Style>
                                                                 <Style TargetType="Border">
                                                                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -1260,7 +1260,7 @@
                                                         <StackPanel Orientation="Horizontal">
 
                                                         <!-- ▌ Row header card (160px, 2-line compact layout) -->
-                                                        <Border Width="310" Height="44"
+                                                        <Border Width="345" Height="44"
                                                                 Background="{DynamicResource BrushBackgroundMid}"
                                                                 BorderBrush="{DynamicResource BrushSeparator}"
                                                                 BorderThickness="0,0,1,1"
@@ -1275,7 +1275,7 @@
                                                                 <Grid Margin="3,2,2,2" VerticalAlignment="Center">
                                                                     <Grid.ColumnDefinitions>
                                                                         <ColumnDefinition Width="100"/>    <!-- city: fixed 100px -->
-                                                                        <ColumnDefinition Width="100"/>    <!-- time range: fixed 100px -->
+                                                                        <ColumnDefinition Width="135"/>    <!-- time range: fixed 135px -->
                                                                         <ColumnDefinition Width="100"/>    <!-- date/weekday: fixed 100px -->
                                                                     </Grid.ColumnDefinitions>
                                                                     <!-- Col 0: Flag + CityName / UTC offset + DST -->
@@ -1310,7 +1310,7 @@
                                                                         <!-- Start → End time -->
                                                                         <StackPanel Orientation="Horizontal">
                                                                             <TextBlock Text="{Binding SelectedTimeStr}"
-                                                                                       FontFamily="Consolas" FontSize="12" FontWeight="Bold"
+                                                                                       FontFamily="Consolas" FontSize="16" FontWeight="Bold"
                                                                                        Foreground="{Binding ThemedAccentBrush}">
                                                                                 <TextBlock.Effect>
                                                                                     <DropShadowEffect BlurRadius="6" ShadowDepth="0"
@@ -1411,8 +1411,8 @@
                                                         <!-- Inner Grid spans the 480px timeline area; both Layer 1a and Layer 1b
                                                              share this origin so the highlight aligns with the band backgrounds
                                                              without any Margin offset. -->
-                                                        <Grid Width="480" Height="44">
-                                                        <!-- Data-row Layer 1a: band background + day-change bar (10px per slot) -->
+                                                        <Grid Width="1152" Height="44">
+                                                        <!-- Data-row Layer 1a: band background + day-change bar (20px per slot) -->
                                                         <ItemsControl ItemsSource="{Binding Cells}">
                                                             <ItemsControl.ItemContainerStyle>
                                                                 <Style TargetType="ContentPresenter">
@@ -1422,12 +1422,12 @@
                                                             </ItemsControl.ItemContainerStyle>
                                                             <ItemsControl.ItemsPanel>
                                                                 <ItemsPanelTemplate>
-                                                                    <Canvas Width="480" Height="44"/>
+                                                                    <Canvas Width="1152" Height="44"/>
                                                                 </ItemsPanelTemplate>
                                                             </ItemsControl.ItemsPanel>
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate>
-                                                                    <Border Width="10" Height="44"
+                                                                    <Border Width="24" Height="44"
                                                                             Background="{Binding Background}"
                                                                             BorderBrush="{DynamicResource BrushSeparator}"
                                                                             BorderThickness="0,0,0,1">
@@ -1448,7 +1448,7 @@
                                                                 </DataTemplate>
                                                             </ItemsControl.ItemTemplate>
                                                         </ItemsControl>
-                                                        <!-- Data-row Layer 1b: per-slot selection highlight (10px per slot).
+                                                        <!-- Data-row Layer 1b: per-slot selection highlight (20px per slot).
                                                              All 48 slots are always visible; each lights up via IsSelected
                                                              when that individual 30-min slot is within the selection range. -->
                                                         <ItemsControl ItemsSource="{Binding Cells}"
@@ -1461,12 +1461,12 @@
                                                             </ItemsControl.ItemContainerStyle>
                                                             <ItemsControl.ItemsPanel>
                                                                 <ItemsPanelTemplate>
-                                                                    <Canvas Width="480" Height="44"/>
+                                                                    <Canvas Width="1152" Height="44"/>
                                                                 </ItemsPanelTemplate>
                                                             </ItemsControl.ItemsPanel>
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate>
-                                                                    <Border Width="10" Height="44">
+                                                                    <Border Width="24" Height="44">
                                                                         <Border.Style>
                                                                             <Style TargetType="Border">
                                                                                 <Setter Property="Visibility" Value="Visible"/>
@@ -1486,7 +1486,7 @@
                                                         </StackPanel>
 
                                                         <!-- Layer 2: hour labels (40px per pair, on top via Grid Z-order, hit-test transparent) -->
-                                                        <ItemsControl ItemsSource="{Binding Cells}" Margin="310,0,0,0"
+                                                        <ItemsControl ItemsSource="{Binding Cells}" Margin="345,0,0,0"
                                                                       IsHitTestVisible="False">
                                                             <ItemsControl.ItemContainerStyle>
                                                                 <Style TargetType="ContentPresenter">
@@ -1496,15 +1496,15 @@
                                                             </ItemsControl.ItemContainerStyle>
                                                             <ItemsControl.ItemsPanel>
                                                                 <ItemsPanelTemplate>
-                                                                    <Canvas Width="480" Height="44" HorizontalAlignment="Left"/>
+                                                                    <Canvas Width="1152" Height="44" HorizontalAlignment="Left"/>
                                                                 </ItemsPanelTemplate>
                                                             </ItemsControl.ItemsPanel>
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate>
-                                                                    <!-- Width=20 forces Canvas to arrange this ContentPresenter at 20px,
+                                                                    <!-- Width=40 forces Canvas to arrange this ContentPresenter at 40px,
                                                                          spanning both the hour cell and the :30 cell of the pair.
                                                                          Collapsed for :30 slots (DesiredSize=0, no rendering). -->
-                                                                    <Border Width="20" Height="44" Background="Transparent">
+                                                                    <Border Width="48" Height="44" Background="Transparent">
                                                                         <Border.Style>
                                                                             <Style TargetType="Border">
                                                                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -1515,7 +1515,7 @@
                                                                                 </Style.Triggers>
                                                                             </Style>
                                                                         </Border.Style>
-                                                                        <StackPanel VerticalAlignment="Center">
+                                                                        <StackPanel VerticalAlignment="Center" Margin="-5,0,-5,0">
                                                                             <TextBlock Text="{Binding TimeHourPart}"
                                                                                        FontFamily="Consolas" FontSize="16"
                                                                                        Foreground="{Binding Foreground}"

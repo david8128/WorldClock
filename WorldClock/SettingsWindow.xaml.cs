@@ -26,8 +26,11 @@ public partial class SettingsWindow : Window
         ThemeComboBox.DisplayMemberPath = "Name";
         ThemeComboBox.SelectedItem      = _theme.ActiveTheme;
 
-        // Opacity slider
+        // Opacity slider — wire AFTER setting Value to prevent the BAML coercion
+        // (Minimum=0.10 coerces default Value=0.0 → 0.10 and fires ValueChanged before
+        //  InitializeComponent returns, which would overwrite _theme.Opacity with 0.10).
         OpacitySlider.Value = _theme.Opacity;
+        OpacitySlider.ValueChanged += OpacitySlider_ValueChanged;
         UpdateOpacityLabel();
 
         // Country / City / Timezone cascade

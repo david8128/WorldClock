@@ -22,7 +22,7 @@ internal static class DiagLog
 #endif
 
     private static readonly string LogFilePath =
-        Path.Combine(Path.GetTempPath(), "worldclock_diag.log");
+        Path.Combine(Path.GetTempPath(), $"worldclock_diag_{Environment.ProcessId}.log");
 
     /// <summary>Turn logging on or off at runtime.</summary>
     public static bool Enabled

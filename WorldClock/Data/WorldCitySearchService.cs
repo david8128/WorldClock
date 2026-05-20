@@ -53,19 +53,22 @@ public static class WorldCitySearchService
     ///   <item>City name prefix / contains — "Lon", "New"</item>
     ///   <item>Country name — "Germany", "Colombia"</item>
     ///   <item>City initials — "NY" → New York, "NOLA" → New Orleans</item>
+    ///   <item>UTC offset — "+5:30" → Bangalore/Mumbai, "-3" → Buenos Aires, "UTC+1" → London</item>
     /// </list>
     /// </summary>
     public static IReadOnlyList<CityEntry> Search(string? query, int maxResults = 14)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
 
-        var qUpper = query.Trim().ToUpperInvariant();
+        var qUpper       = query.Trim().ToUpperInvariant();
+        var parsedOffset = TryParseUtcOffset(query.Trim());
 
         return All
-            .Select(c => (city: c, score: Score(c, qUpper)))
+            .Select((c, rank) => (city: c, score: Score(c, qUpper, parsedOffset), rank))
             .Where(x => x.score > 0)
             .OrderByDescending(x => x.score)
-            .ThenBy(x => x.city.City)
+            .ThenBy(x => x.rank)        // curated cities (low index) win ties over CSV-only cities
+            .ThenBy(x => x.city.City)   // alphabetical within the same rank tier
             .Take(maxResults)
             .Select(x => x.city)
             .ToList();
@@ -73,12 +76,23 @@ public static class WorldCitySearchService
 
     // ── Scoring ───────────────────────────────────────────────────────────────
 
-    private static int Score(CityEntry c, string qUpper)
+    private static int Score(CityEntry c, string qUpper, TimeSpan? parsedOffset)
     {
         int score = 0;
         var city    = c.City.ToUpperInvariant();
         var country = c.Country.ToUpperInvariant();
         var tzId    = c.TimeZoneId.ToUpperInvariant();
+
+        // UTC offset match: "+5:30"→India, "-3"→Argentina, "UTC+1"→UK winter
+        if (parsedOffset.HasValue)
+        {
+            try
+            {
+                var tz = TimeZoneInfo.FindSystemTimeZoneById(c.TimeZoneId);
+                if (tz.BaseUtcOffset == parsedOffset.Value) score += 150;
+            }
+            catch { /* unknown timezone id — skip */ }
+        }
 
         // Exact code match (highest): BOG→Bogotá, NYC→New York, LAX→Los Angeles
         if (c.Codes is { Length: > 0 } codes &&
@@ -116,6 +130,50 @@ public static class WorldCitySearchService
              .Where(w => w.Length > 0)
              .Select(w => char.ToUpper(w[0]))
              .ToArray());
+
+    /// <summary>
+    /// Parses a UTC offset query into a <see cref="TimeSpan"/>.
+    /// Accepts: "+5:30", "-3", "+5.5", "UTC+5:30", "UTC-8", "+00:00", etc.
+    /// Returns <see langword="null"/> when the string is not an offset expression.
+    /// </summary>
+    private static TimeSpan? TryParseUtcOffset(string q)
+    {
+        if (string.IsNullOrWhiteSpace(q)) return null;
+
+        // Strip optional leading "UTC"
+        var s = q.StartsWith("UTC", StringComparison.OrdinalIgnoreCase) ? q[3..] : q;
+
+        int sign = 1;
+        if      (s.StartsWith('+')) { sign =  1; s = s[1..]; }
+        else if (s.StartsWith('-')) { sign = -1; s = s[1..]; }
+        else return null;  // require explicit sign so plain city names don't accidentally parse
+
+        if (string.IsNullOrEmpty(s)) return null;
+
+        // "H:MM" or "HH:MM"
+        if (s.Contains(':')
+            && s.Split(':') is [var hPart, var mPart]
+            && int.TryParse(hPart, out int hColon)
+            && int.TryParse(mPart, out int mColon)
+            && hColon is >= 0 and <= 14
+            && mColon is >= 0 and < 60)
+            return TimeSpan.FromMinutes(sign * (hColon * 60 + mColon));
+
+        // "H.D" decimal (e.g. "+5.5" → +5h30m)
+        if (s.Contains('.')
+            && double.TryParse(s,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double dec)
+            && dec is >= 0 and <= 14)
+            return TimeSpan.FromHours(sign * dec);
+
+        // Plain integer hours
+        if (int.TryParse(s, out int h) && h is >= 0 and <= 14)
+            return TimeSpan.FromHours(sign * h);
+
+        return null;
+    }
 
     // ── Database building ─────────────────────────────────────────────────────
 
