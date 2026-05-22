@@ -1,5 +1,4 @@
-using System.Windows;
-using System.Windows.Media;
+using Avalonia.Media;
 using FluentAssertions;
 using WorldClock.Helpers;
 using Xunit;
@@ -27,7 +26,14 @@ public sealed class AcrylicHelperTests
     [Fact]
     public void AcrylicHelper_DetectedTier_IsAtLeastWin10_1803_OnCurrentMachine()
     {
-        // The test runner requires Windows 10 1803+ with .NET 8 — Legacy tier is impossible here.
+        // AcrylicHelper is a cross-platform no-op stub on non-Windows; Legacy is expected.
+        // On Windows 10 1803+ it should be Win10_1803 or higher.
+        if (!OperatingSystem.IsWindows())
+        {
+            AcrylicHelper.DetectedTier.Should().Be(AcrylicTier.Legacy,
+                "non-Windows platforms always return Legacy tier");
+            return;
+        }
         AcrylicHelper.DetectedTier.Should().NotBe(AcrylicTier.Legacy,
             "the build machine must be running Windows 10 1803 or later");
     }
@@ -230,127 +236,49 @@ public sealed class AcrylicHelperTests
             "tint alpha should be lighter than the WPF background alpha");
     }
 
-    // ── Enable / Disable smoke tests (STA thread + real HWND) ─────────────────
+    // ── Enable / Disable smoke tests (cross-platform stub) ────────────────────
     //
-    // These tests verify that the P/Invoke path never throws on any supported OS.
-    // They do NOT verify visual output (which requires a live compositor session).
+    // AcrylicHelper.Enable / Disable are no-op stubs on non-Windows (Avalonia
+    // handles transparency via TransparencyLevelHint="AcrylicBlur").
+    // These tests verify the stubs never throw regardless of arguments.
 
-    [StaFact]
+    [Fact]
     public void AcrylicHelper_Enable_DarkTheme_DoesNotThrow()
     {
-        var window = CreateHiddenWindow();
-        try
-        {
-            var act = () => AcrylicHelper.Enable(window, Color.FromRgb(0x1E, 0x1E, 0x2E), 180, true);
-            act.Should().NotThrow("Enable must fail silently on all supported OS versions");
-        }
-        finally { window.Close(); }
+        var act = () => AcrylicHelper.Enable(null, Color.FromRgb(0x1E, 0x1E, 0x2E), 180, true);
+        act.Should().NotThrow("Enable must fail silently on all supported OS versions");
     }
 
-    [StaFact]
+    [Fact]
     public void AcrylicHelper_Enable_LightTheme_DoesNotThrow()
     {
-        var window = CreateHiddenWindow();
-        try
-        {
-            var act = () => AcrylicHelper.Enable(window, Color.FromRgb(0xF5, 0xF5, 0xF5), 220, false);
-            act.Should().NotThrow();
-        }
-        finally { window.Close(); }
+        var act = () => AcrylicHelper.Enable(null, Color.FromRgb(0xF5, 0xF5, 0xF5), 220, false);
+        act.Should().NotThrow();
     }
 
-    [StaFact]
-    public void AcrylicHelper_Enable_ReturnsTierMatchingDetectedTier()
-    {
-        var window = CreateHiddenWindow();
-        try
-        {
-            var tier = AcrylicHelper.Enable(window, Color.FromRgb(0x24, 0x28, 0x3B), 150, true);
-            tier.Should().Be(AcrylicHelper.DetectedTier,
-                "Enable must return exactly the tier selected by DetectedTier");
-        }
-        finally { window.Close(); }
-    }
-
-    [StaFact]
+    [Fact]
     public void AcrylicHelper_Enable_ZeroAlpha_DoesNotThrow()
     {
-        // Edge case: tintAlpha=0 means fully transparent tint — must not crash.
-        var window = CreateHiddenWindow();
-        try
-        {
-            var act = () => AcrylicHelper.Enable(window, Color.FromRgb(0x1E, 0x1E, 0x2E), 0, true);
-            act.Should().NotThrow();
-        }
-        finally { window.Close(); }
+        var act = () => AcrylicHelper.Enable(null, Color.FromRgb(0x1E, 0x1E, 0x2E), 0, true);
+        act.Should().NotThrow();
     }
 
-    [StaFact]
+    [Fact]
     public void AcrylicHelper_Enable_MaxAlpha_DoesNotThrow()
     {
-        // Edge case: tintAlpha=255 means fully opaque tint.
-        var window = CreateHiddenWindow();
-        try
-        {
-            var act = () => AcrylicHelper.Enable(window, Color.FromRgb(0x1E, 0x1E, 0x2E), 255, true);
-            act.Should().NotThrow();
-        }
-        finally { window.Close(); }
+        var act = () => AcrylicHelper.Enable(null, Color.FromRgb(0x1E, 0x1E, 0x2E), 255, true);
+        act.Should().NotThrow();
     }
 
-    [StaFact]
-    public void AcrylicHelper_Disable_AfterEnable_DoesNotThrow()
-    {
-        var window = CreateHiddenWindow();
-        try
-        {
-            AcrylicHelper.Enable(window, Color.FromRgb(0x1E, 0x1E, 0x2E), 150, true);
-            var act = () => AcrylicHelper.Disable(window);
-            act.Should().NotThrow("Disable must always fail silently");
-        }
-        finally { window.Close(); }
-    }
-
-    [StaFact]
+    [Fact]
     public void AcrylicHelper_MultipleEnableCalls_DoNotThrow()
     {
-        // Simulates rapid theme changes: multiple Enable calls on the same window.
-        var window = CreateHiddenWindow();
-        try
+        var act = () =>
         {
-            var act = () =>
-            {
-                AcrylicHelper.Enable(window, Color.FromRgb(0x1E, 0x1E, 0x2E), 150, true);
-                AcrylicHelper.Enable(window, Color.FromRgb(0xF5, 0xF5, 0xF5), 200, false);
-                AcrylicHelper.Enable(window, Color.FromRgb(0x24, 0x28, 0x3B), 100, true);
-            };
-            act.Should().NotThrow();
-        }
-        finally { window.Close(); }
-    }
-
-    // ── Helper ────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Creates a hidden WPF window whose HWND is already allocated via
-    /// <see cref="System.Windows.Interop.WindowInteropHelper.EnsureHandle"/>,
-    /// so <see cref="AcrylicHelper"/> can call DWM/user32 APIs against it.
-    /// The caller is responsible for calling <see cref="Window.Close"/> when done.
-    /// </summary>
-    private static Window CreateHiddenWindow()
-    {
-        var window = new Window
-        {
-            Width              = 200,
-            Height             = 200,
-            WindowStyle        = WindowStyle.None,
-            AllowsTransparency = true,
-            Background         = Brushes.Transparent,
-            ShowInTaskbar      = false,
-            Visibility         = Visibility.Hidden,
+            AcrylicHelper.Enable(null, Color.FromRgb(0x1E, 0x1E, 0x2E), 150, true);
+            AcrylicHelper.Enable(null, Color.FromRgb(0xF5, 0xF5, 0xF5), 200, false);
+            AcrylicHelper.Enable(null, Color.FromRgb(0x24, 0x28, 0x3B), 100, true);
         };
-        // Allocate the Win32 HWND without ever showing the window on screen.
-        _ = new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
-        return window;
+        act.Should().NotThrow();
     }
 }

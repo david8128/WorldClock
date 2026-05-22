@@ -21,6 +21,21 @@ public sealed record CityEntry(
     /// Bindable in XAML to show all IATA/airport codes for this city in search results.
     /// </summary>
     public string PrimaryCode => Codes is { Length: > 0 } ? string.Join(" | ", Codes) : string.Empty;
+
+    /// <summary>
+    /// Display text for the city search dropdown.
+    /// Format: "City | Flag | Code1 | Code2 | …" (all separated with | signs).
+    /// </summary>
+    public string SearchLabel
+    {
+        get
+        {
+            var parts = new System.Collections.Generic.List<string> { City, CountryFlag };
+            if (Codes is { Length: > 0 })
+                parts.AddRange(Codes);
+            return string.Join(" | ", parts);
+        }
+    }
 }
 
 /// <summary>
@@ -260,6 +275,72 @@ public static class CityDatabase
         // ── Vietnam ──────────────────────────────────────────────────────────
         new("Vietnam",      "🇻🇳", "Hanoi",            "SE Asia Standard Time",       Codes: new[]{"HAN","HNI"}),
         new("Vietnam",      "🇻🇳", "Ho Chi Minh City", "SE Asia Standard Time",       Codes: new[]{"SGN","HCM","TSN"}),
+
+        // ── Timezone Catalog ─────────────────────────────────────────────────
+        // Searchable by standard abbreviation: "GMT", "BST", "EDT", "JST", etc.
+        // These also appear as a "Time Zones" group in the country / city dropdowns.
+
+        // Universal
+        new("Time Zones", "🌐", "UTC — Coordinated Universal Time", "UTC",                              Codes: new[]{"UTC","Z","UCT"}),
+        new("Time Zones", "🌐", "GMT — Greenwich Mean Time",       "GMT Standard Time",                Codes: new[]{"GMT","WET"}),
+
+        // Europe
+        new("Time Zones", "🇬🇧", "BST — British Summer Time",       "GMT Standard Time",               Codes: new[]{"BST"}),
+        new("Time Zones", "🇪🇺", "CET — Central European Time",     "Central Europe Standard Time",    Codes: new[]{"CET"}),
+        new("Time Zones", "🇪🇺", "CEST — Central European Summer",  "Central Europe Standard Time",    Codes: new[]{"CEST","CEDT"}),
+        new("Time Zones", "🇪🇺", "EET — Eastern European Time",     "E. Europe Standard Time",         Codes: new[]{"EET"}),
+        new("Time Zones", "🇪🇺", "EEST — Eastern European Summer",  "E. Europe Standard Time",         Codes: new[]{"EEST","EEDT"}),
+        new("Time Zones", "🇷🇺", "MSK — Moscow Standard Time",      "Russian Standard Time",           Codes: new[]{"MSK","MSD"}),
+        new("Time Zones", "🇹🇷", "TRT — Turkey Time",               "Turkey Standard Time",            Codes: new[]{"TRT"}),
+        new("Time Zones", "🇮🇷", "IRST — Iran Standard Time",       "Iran Standard Time",              Codes: new[]{"IRST","IRDT"}),
+
+        // North America
+        new("Time Zones", "🇺🇸", "ET — Eastern Time (US)",          "Eastern Standard Time",           Codes: new[]{"ET","EST","EDT"}),
+        new("Time Zones", "🇺🇸", "CT — Central Time (US)",          "Central Standard Time",           Codes: new[]{"CT","CST","CDT"}),
+        new("Time Zones", "🇺🇸", "MT — Mountain Time (US)",         "Mountain Standard Time",          Codes: new[]{"MT","MST","MDT"}),
+        new("Time Zones", "🇺🇸", "PT — Pacific Time (US)",          "Pacific Standard Time",           Codes: new[]{"PT","PST","PDT"}),
+        new("Time Zones", "🇺🇸", "AKT — Alaska Time",               "Alaskan Standard Time",           Codes: new[]{"AKT","AKST","AKDT"}),
+        new("Time Zones", "🇺🇸", "HST — Hawaii Standard Time",      "Hawaiian Standard Time",          Codes: new[]{"HST","HAT"}),
+        new("Time Zones", "🇨🇦", "AT — Atlantic Time (Canada)",     "Atlantic Standard Time",          Codes: new[]{"AT","ADT"}),
+        new("Time Zones", "🇨🇦", "NST — Newfoundland Time",         "Newfoundland Standard Time",      Codes: new[]{"NST","NDT"}),
+
+        // South America
+        new("Time Zones", "🇧🇷", "BRT — Brasília Time",             "E. South America Standard Time",  Codes: new[]{"BRT","BRST"}),
+        new("Time Zones", "🇦🇷", "ART — Argentina Time",            "Argentina Standard Time",         Codes: new[]{"ART"}),
+        new("Time Zones", "🇨🇴", "COT — Colombia Time",             "SA Pacific Standard Time",        Codes: new[]{"COT"}),
+        new("Time Zones", "🇻🇪", "VET — Venezuela Time",            "Venezuela Standard Time",         Codes: new[]{"VET"}),
+        new("Time Zones", "🇨🇱", "CLT — Chile Standard Time",       "Pacific SA Standard Time",        Codes: new[]{"CLT","CLST"}),
+
+        // Africa
+        new("Time Zones", "🇿🇦", "SAST — South Africa Standard",    "South Africa Standard Time",      Codes: new[]{"SAST","CAT"}),
+        new("Time Zones", "🌍",  "EAT — East Africa Time",           "E. Africa Standard Time",         Codes: new[]{"EAT"}),
+        new("Time Zones", "🌍",  "WAT — West Africa Time",           "W. Central Africa Standard Time", Codes: new[]{"WAT"}),
+
+        // Middle East
+        new("Time Zones", "🇸🇦", "AST — Arabia Standard Time",       "Arab Standard Time",              Codes: new[]{"AST"}),
+        new("Time Zones", "🇦🇪", "GST — Gulf Standard Time",         "Arabian Standard Time",           Codes: new[]{"GST"}),
+        new("Time Zones", "🇮🇱", "IDT — Israel Time",                "Israel Standard Time",            Codes: new[]{"IDT","IST IL"}),
+        new("Time Zones", "🇮🇷", "AFT — Afghanistan Time",           "Afghanistan Standard Time",       Codes: new[]{"AFT"}),
+
+        // South Asia
+        new("Time Zones", "🇵🇰", "PKT — Pakistan Standard Time",     "Pakistan Standard Time",          Codes: new[]{"PKT"}),
+        new("Time Zones", "🇮🇳", "IST — India Standard Time",        "India Standard Time",             Codes: new[]{"IST"}),
+        new("Time Zones", "🇧🇩", "BDT — Bangladesh Standard Time",   "Bangladesh Standard Time",        Codes: new[]{"BDT"}),
+        new("Time Zones", "🇳🇵", "NPT — Nepal Time",                 "Nepal Standard Time",             Codes: new[]{"NPT"}),
+        new("Time Zones", "🇲🇲", "MMT — Myanmar Time",               "Myanmar Standard Time",           Codes: new[]{"MMT"}),
+
+        // Southeast & East Asia
+        new("Time Zones", "🇹🇭", "ICT — Indochina Time",             "SE Asia Standard Time",           Codes: new[]{"ICT","WIB"}),
+        new("Time Zones", "🇨🇳", "CST — China Standard Time",        "China Standard Time",             Codes: new[]{"CST CN","HKT"}),
+        new("Time Zones", "🇸🇬", "SGT — Singapore Time",             "Singapore Standard Time",         Codes: new[]{"SGT","MYT","PHT","SST"}),
+        new("Time Zones", "🇯🇵", "JST — Japan Standard Time",        "Tokyo Standard Time",             Codes: new[]{"JST","JT"}),
+        new("Time Zones", "🇰🇷", "KST — Korea Standard Time",        "Korea Standard Time",             Codes: new[]{"KST","KT"}),
+
+        // Australia & Pacific
+        new("Time Zones", "🇦🇺", "AWST — Australian Western Time",   "W. Australia Standard Time",      Codes: new[]{"AWST"}),
+        new("Time Zones", "🇦🇺", "ACST — Australian Central Time",   "Cen. Australia Standard Time",    Codes: new[]{"ACST","ACDT"}),
+        new("Time Zones", "🇦🇺", "AEST — Australian Eastern Time",   "AUS Eastern Standard Time",       Codes: new[]{"AEST","AEDT","AET"}),
+        new("Time Zones", "🇳🇿", "NZST — New Zealand Time",          "New Zealand Standard Time",       Codes: new[]{"NZST","NZDT"}),
     };
 
     /// <summary>Returns a sorted, distinct list of country names.</summary>

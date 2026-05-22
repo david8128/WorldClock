@@ -482,8 +482,8 @@ public sealed class TimeTranslatorViewModel : INotifyPropertyChanged
                 CountryFlag = "🌐",
                 Country     = "Universal Time",
                 UtcOffset   = "UTC+00:00",
-                AccentBrush = new System.Windows.Media.SolidColorBrush(
-                                  System.Windows.Media.Color.FromRgb(0x88, 0x88, 0xAA)),
+                AccentBrush = new Avalonia.Media.SolidColorBrush(
+                                  Avalonia.Media.Color.FromRgb(0x88, 0x88, 0xAA)),
                 IsSource    = _sourceZone.Id == TimeZoneInfo.Utc.Id,
                 Cells       = utcCells,
             };

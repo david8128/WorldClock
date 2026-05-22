@@ -13,32 +13,32 @@ public class ThemeServiceTests
 
     // ── Theme catalogue ───────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void AppTheme_All_HasAtLeastTenThemes()
     {
         AppTheme.All.Should().HaveCountGreaterThanOrEqualTo(10);
     }
 
-    [StaFact]
+    [Fact]
     public void AppTheme_All_AllHaveUniqueName()
     {
         var names = AppTheme.All.Select(t => t.Name).ToList();
         names.Should().OnlyHaveUniqueItems("each theme must have a distinct name");
     }
 
-    [StaFact]
+    [Fact]
     public void AppTheme_All_ContainsDarkDefault()
     {
         AppTheme.All.Should().Contain(t => t.Name == "Dark Default");
     }
 
-    [StaFact]
+    [Fact]
     public void AppTheme_All_ContainsLightDefault()
     {
         AppTheme.All.Should().Contain(t => t.Name == "Light Default");
     }
 
-    [StaTheory]
+    [Theory]
     [InlineData("One Dark")]
     [InlineData("Monokai")]
     [InlineData("Solarized Dark")]
@@ -53,7 +53,7 @@ public class ThemeServiceTests
         AppTheme.All.Should().Contain(t => t.Name == name, $"theme '{name}' must exist");
     }
 
-    [StaFact]
+    [Fact]
     public void AppTheme_All_AllHaveNonDefaultBackgroundDark()
     {
         // BackgroundDark must be set (not default Color struct == transparent black)
@@ -61,21 +61,21 @@ public class ThemeServiceTests
             t.BackgroundDark.Should().NotBe(default));
     }
 
-    [StaFact]
+    [Fact]
     public void AppTheme_All_AllHaveNonDefaultAccentPrimary()
     {
         AppTheme.All.Should().AllSatisfy(t =>
             t.AccentPrimary.Should().NotBe(default));
     }
 
-    [StaFact]
+    [Fact]
     public void AppTheme_BrushBackgroundDark_IsNotNull()
     {
         var theme = AppTheme.All[0];
         theme.BrushBackgroundDark.Should().NotBeNull();
     }
 
-    [StaFact]
+    [Fact]
     public void AppTheme_BrushAccentPrimary_ColorMatchesAccentPrimary()
     {
         var theme = AppTheme.All.First(t => t.Name == "One Dark");
@@ -84,7 +84,7 @@ public class ThemeServiceTests
 
     // ── ThemeService state ────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void ThemeService_DefaultTheme_IsDarkDefault()
     {
         // Reset to known state — the service is a singleton shared across tests
@@ -92,7 +92,7 @@ public class ThemeServiceTests
         Svc.ActiveTheme.Name.Should().Be("Dark Default");
     }
 
-    [StaFact]
+    [Fact]
     public void ThemeService_SetActiveTheme_ChangesTheme()
     {
         var nord = AppTheme.All.First(t => t.Name == "Nord Dark");
@@ -102,7 +102,7 @@ public class ThemeServiceTests
         Svc.ActiveTheme = AppTheme.All[0];
     }
 
-    [StaFact]
+    [Fact]
     public void ThemeService_SetActiveTheme_FiresPropertyChanged()
     {
         var raised = new List<string?>();
@@ -117,21 +117,21 @@ public class ThemeServiceTests
 
     // ── Opacity ───────────────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void ThemeService_DefaultOpacity_IsOne()
     {
         Svc.Opacity = 1.0;
         Svc.Opacity.Should().BeApproximately(1.0, 0.001);
     }
 
-    [StaFact]
+    [Fact]
     public void ThemeService_SetOpacity_Clamps_AboveMax()
     {
         Svc.Opacity = 1.5;
         Svc.Opacity.Should().BeApproximately(1.0, 0.001);
     }
 
-    [StaFact]
+    [Fact]
     public void ThemeService_SetOpacity_Clamps_BelowMin()
     {
         Svc.Opacity = 0.0;
@@ -139,7 +139,7 @@ public class ThemeServiceTests
         Svc.Opacity = 1.0; // restore
     }
 
-    [StaFact]
+    [Fact]
     public void ThemeService_SetOpacity_AcceptsValidValue()
     {
         Svc.Opacity = 0.5;
@@ -147,7 +147,7 @@ public class ThemeServiceTests
         Svc.Opacity = 1.0;
     }
 
-    [StaFact]
+    [Fact]
     public void ThemeService_SetOpacity_FiresPropertyChanged()
     {
         Svc.Opacity = 1.0;
@@ -160,7 +160,7 @@ public class ThemeServiceTests
         Svc.Opacity = 1.0;
     }
 
-    [StaTheory]
+    [Theory]
     [InlineData(0.1)]
     [InlineData(0.25)]
     [InlineData(0.5)]
@@ -175,14 +175,14 @@ public class ThemeServiceTests
 
     // ── DeleteMode ────────────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void ThemeService_DeleteMode_DefaultIsFalse()
     {
         Svc.DeleteMode = false;
         Svc.DeleteMode.Should().BeFalse();
     }
 
-    [StaFact]
+    [Fact]
     public void ThemeService_SetDeleteMode_True_FiresPropertyChanged()
     {
         Svc.DeleteMode = false;
@@ -195,7 +195,7 @@ public class ThemeServiceTests
         Svc.DeleteMode = false;
     }
 
-    [StaFact]
+    [Fact]
     public void ThemeService_SetDeleteMode_False_FiresPropertyChanged()
     {
         Svc.DeleteMode = true;
@@ -209,35 +209,35 @@ public class ThemeServiceTests
 
     // ── IsDark ────────────────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void AppTheme_IsDark_DarkDefault_IsTrue()
     {
         var theme = AppTheme.All.First(t => t.Name == "Dark Default");
         theme.IsDark.Should().BeTrue("Dark Default has a very dark background");
     }
 
-    [StaFact]
+    [Fact]
     public void AppTheme_IsDark_LightDefault_IsFalse()
     {
         var theme = AppTheme.All.First(t => t.Name == "Light Default");
         theme.IsDark.Should().BeFalse("Light Default has a very light background");
     }
 
-    [StaFact]
+    [Fact]
     public void AppTheme_IsDark_CatppuccinLatte_IsFalse()
     {
         var theme = AppTheme.All.First(t => t.Name == "Catppuccin Latte");
         theme.IsDark.Should().BeFalse("Catppuccin Latte is a light theme");
     }
 
-    [StaFact]
+    [Fact]
     public void AppTheme_IsDark_SolarizedLight_IsFalse()
     {
         var theme = AppTheme.All.First(t => t.Name == "Solarized Light");
         theme.IsDark.Should().BeFalse("Solarized Light is a light theme");
     }
 
-    [StaTheory]
+    [Theory]
     [InlineData("One Dark")]
     [InlineData("Monokai")]
     [InlineData("Solarized Dark")]
@@ -251,7 +251,7 @@ public class ThemeServiceTests
         theme.IsDark.Should().BeTrue($"'{name}' is a dark theme");
     }
 
-    [StaTheory]
+    [Theory]
     [InlineData("Light Default")]
     [InlineData("Solarized Light")]
     [InlineData("Catppuccin Latte")]

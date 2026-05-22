@@ -1,4 +1,4 @@
-using System.Windows.Media;
+using Avalonia.Media;
 using FluentAssertions;
 using WorldClock.Models;
 using Xunit;
@@ -12,7 +12,6 @@ public class ClockLocationTests
     private static ClockLocation BuildLocation(string tzId = "UTC")
     {
         var brush = new SolidColorBrush(Colors.Cyan);
-        brush.Freeze(); // thread-safe; required to use across STA context
         return new ClockLocation
         {
             CityName    = "Test City",
@@ -25,7 +24,7 @@ public class ClockLocationTests
 
     // ── CurrentTime format ────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void Refresh_SetsCurrentTime_InHhMmSsFormat()
     {
         var location = BuildLocation();
@@ -34,7 +33,7 @@ public class ClockLocationTests
             "CurrentTime must be HH:mm:ss");
     }
 
-    [StaFact]
+    [Fact]
     public void Refresh_SetsCurrentTime_ToNonEmptyString()
     {
         var location = BuildLocation();
@@ -44,7 +43,7 @@ public class ClockLocationTests
 
     // ── CurrentDate format ────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void Refresh_SetsCurrentDate_InDddDdMmmYyyyFormat()
     {
         var location = BuildLocation();
@@ -54,7 +53,7 @@ public class ClockLocationTests
             "CurrentDate must be 'ddd, dd MMM yyyy'");
     }
 
-    [StaFact]
+    [Fact]
     public void Refresh_SetsCurrentDate_ContainsCurrentYear()
     {
         var location = BuildLocation();
@@ -64,7 +63,7 @@ public class ClockLocationTests
 
     // ── UtcOffset format ──────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void Refresh_SetsUtcOffset_ForUtcTimezone_ToUtcPlusZero()
     {
         var location = BuildLocation("UTC");
@@ -72,7 +71,7 @@ public class ClockLocationTests
         location.UtcOffset.Should().Be("UTC+00:00");
     }
 
-    [StaFact]
+    [Fact]
     public void Refresh_SetsUtcOffset_AlwaysStartsWithUtc()
     {
         var location = BuildLocation("Eastern Standard Time");
@@ -80,7 +79,7 @@ public class ClockLocationTests
         location.UtcOffset.Should().StartWith("UTC");
     }
 
-    [StaFact]
+    [Fact]
     public void Refresh_SetsUtcOffset_MatchesExpectedPattern()
     {
         var location = BuildLocation("Romance Standard Time"); // UTC+1 or UTC+2 depending on DST
@@ -90,7 +89,7 @@ public class ClockLocationTests
 
     // ── INotifyPropertyChanged ────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void Refresh_RaisesPropertyChanged_ForCurrentTime()
     {
         var location = BuildLocation();
@@ -102,7 +101,7 @@ public class ClockLocationTests
         raised.Should().Contain(nameof(ClockLocation.CurrentTime));
     }
 
-    [StaFact]
+    [Fact]
     public void Refresh_RaisesPropertyChanged_ForCurrentDate()
     {
         var location = BuildLocation();
@@ -114,7 +113,7 @@ public class ClockLocationTests
         raised.Should().Contain(nameof(ClockLocation.CurrentDate));
     }
 
-    [StaFact]
+    [Fact]
     public void Refresh_RaisesPropertyChanged_ForUtcOffset()
     {
         var location = BuildLocation();
@@ -126,7 +125,7 @@ public class ClockLocationTests
         raised.Should().Contain(nameof(ClockLocation.UtcOffset));
     }
 
-    [StaFact]
+    [Fact]
     public void Refresh_RaisesPropertyChanged_ThreeTimesMinimum()
     {
         var location = BuildLocation();
@@ -141,7 +140,7 @@ public class ClockLocationTests
 
     // ── Error handling ────────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void Refresh_WithInvalidTimeZoneId_ThrowsTimeZoneNotFoundException()
     {
         var location = BuildLocation("Invalid/NotATimezone");
@@ -151,7 +150,7 @@ public class ClockLocationTests
 
     // ── Multi-timezone accuracy ───────────────────────────────────────────────
 
-    [StaTheory]
+    [Theory]
     [InlineData("UTC",                        "+00:00")]
     [InlineData("Eastern Standard Time",      "-05:00")]  // EST (non-DST)
     [InlineData("GMT Standard Time",          "+00:00")]  // GMT (non-DST)

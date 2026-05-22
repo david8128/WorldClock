@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Windows.Media;
+using Avalonia.Media;
 using WorldClock.Services;
 
 namespace WorldClock.Models;
@@ -15,12 +15,7 @@ public sealed class TimeGridCell : INotifyPropertyChanged
 
     static TimeGridCell()
     {
-        static SolidColorBrush Mk(string hex)
-        {
-            var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
-            b.Freeze();
-            return b;
-        }
+        static SolidColorBrush Mk(string hex) => new SolidColorBrush(Color.Parse(hex));
 
         // Dark-theme cell fills — deep, saturated night/day colours
         BackgroundsDark = new Dictionary<TimeBand, SolidColorBrush>
@@ -104,6 +99,9 @@ public sealed class TimeGridCell : INotifyPropertyChanged
 
     /// <summary>True for on-the-hour slots (SlotIndex even).</summary>
     public bool IsHourSlot => SlotIndex % 2 == 0;
+
+    /// <summary>True when this cell falls in the next calendar day (DayDiff == "+1").</summary>
+    public bool IsNextDay => DayDiff == "+1";
 
     /// <summary>Cell fill: dark tint on dark themes, subtle pastel tint on light themes.</summary>
     public SolidColorBrush Background =>

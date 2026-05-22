@@ -9,14 +9,14 @@ public class MainViewModelTests
 {
     // ── Count & structure ─────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void Locations_HasSevenItems()
     {
         var vm = TestViewModel.Fresh();
         vm.Locations.Should().HaveCount(7);
     }
 
-    [StaFact]
+    [Fact]
     public void Locations_FirstItem_IsUtcGmt()
     {
         var vm = TestViewModel.Fresh();
@@ -25,7 +25,7 @@ public class MainViewModelTests
         utc.TimeZoneId.Should().Be("UTC");
     }
 
-    [StaFact]
+    [Fact]
     public void Locations_ContainsAllExpectedCities()
     {
         var vm    = TestViewModel.Fresh();
@@ -42,7 +42,7 @@ public class MainViewModelTests
 
     // ── Data integrity ────────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void Locations_AllHaveNonEmptyCityName()
     {
         var vm = TestViewModel.Fresh();
@@ -50,7 +50,7 @@ public class MainViewModelTests
             l.CityName.Should().NotBeNullOrWhiteSpace());
     }
 
-    [StaFact]
+    [Fact]
     public void Locations_AllHaveNonEmptyCountryFlag()
     {
         var vm = TestViewModel.Fresh();
@@ -58,7 +58,7 @@ public class MainViewModelTests
             l.CountryFlag.Should().NotBeNullOrWhiteSpace());
     }
 
-    [StaFact]
+    [Fact]
     public void Locations_AllHaveNonEmptyTeamLabel()
     {
         var vm = TestViewModel.Fresh();
@@ -66,7 +66,7 @@ public class MainViewModelTests
             l.TeamLabel.Should().NotBeNullOrWhiteSpace());
     }
 
-    [StaFact]
+    [Fact]
     public void Locations_AllHaveNonNullAccentBrush()
     {
         var vm = TestViewModel.Fresh();
@@ -74,7 +74,7 @@ public class MainViewModelTests
             l.AccentBrush.Should().NotBeNull());
     }
 
-    [StaFact]
+    [Fact]
     public void Locations_AllHaveValidTimeZoneIds()
     {
         var vm = TestViewModel.Fresh();
@@ -85,7 +85,7 @@ public class MainViewModelTests
         }
     }
 
-    [StaFact]
+    [Fact]
     public void Locations_CityNames_AreUnique()
     {
         var vm    = TestViewModel.Fresh();
@@ -95,7 +95,7 @@ public class MainViewModelTests
 
     // ── Initial clock state (Add() calls Refresh() internally) ───────────────
 
-    [StaFact]
+    [Fact]
     public void Locations_AllHaveCurrentTime_AfterConstruction()
     {
         var vm = TestViewModel.Fresh();
@@ -103,7 +103,7 @@ public class MainViewModelTests
             l.CurrentTime.Should().NotBeNullOrWhiteSpace());
     }
 
-    [StaFact]
+    [Fact]
     public void Locations_AllHaveCurrentDate_AfterConstruction()
     {
         var vm = TestViewModel.Fresh();
@@ -111,7 +111,7 @@ public class MainViewModelTests
             l.CurrentDate.Should().NotBeNullOrWhiteSpace());
     }
 
-    [StaFact]
+    [Fact]
     public void Locations_AllHaveUtcOffset_AfterConstruction()
     {
         var vm = TestViewModel.Fresh();
@@ -119,7 +119,7 @@ public class MainViewModelTests
             l.UtcOffset.Should().StartWith("UTC"));
     }
 
-    [StaFact]
+    [Fact]
     public void Locations_CurrentTime_MatchesHhMmSsFormat()
     {
         var vm = TestViewModel.Fresh();
@@ -129,7 +129,7 @@ public class MainViewModelTests
 
     // ── Specific city/timezone mapping ────────────────────────────────────────
 
-    [StaTheory]
+    [Theory]
     [InlineData("New York",  "Eastern Standard Time")]
     [InlineData("London",    "GMT Standard Time")]
     [InlineData("Madrid",    "Romance Standard Time")]
@@ -147,7 +147,7 @@ public class MainViewModelTests
 
     // ── UTC time accuracy ─────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void Locations_UtcEntry_CurrentTime_MatchesUtcNow_WithinTwoSeconds()
     {
         var vm      = TestViewModel.Fresh();

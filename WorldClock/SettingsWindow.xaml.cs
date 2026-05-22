@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
-using System.Windows.Media;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Media;
 using WorldClock.Data;
 using WorldClock.Helpers;
 using WorldClock.Models;
@@ -17,15 +17,16 @@ public partial class SettingsWindow : Window
     private readonly MainViewModel _vm;
     private readonly ThemeService  _theme = ThemeService.Instance;
 
+    public SettingsWindow() : this(null!) { }
+
     public SettingsWindow(MainViewModel vm)
     {
         InitializeComponent();
         _vm = vm;
 
         // Theme picker
-        ThemeComboBox.ItemsSource       = AppTheme.All;
-        ThemeComboBox.DisplayMemberPath = "Name";
-        ThemeComboBox.SelectedItem      = _theme.ActiveTheme;
+        ThemeComboBox.ItemsSource  = AppTheme.All;
+        ThemeComboBox.SelectedItem = _theme.ActiveTheme;
 
         // Opacity slider — wire AFTER setting Value to prevent the BAML coercion
         // (Minimum=0.10 coerces default Value=0.0 → 0.10 and fires ValueChanged before
@@ -57,14 +58,13 @@ public partial class SettingsWindow : Window
         StartupToggle.IsChecked = _theme.RunOnStartup;
         UpdateStartupToggleContent();
 
-        // Placeholder visibility
-        CityNameBox.TextChanged  += (_, _) => CityNamePlaceholder.Visibility =
-            string.IsNullOrEmpty(CityNameBox.Text) ? Visibility.Visible : Visibility.Collapsed;
-        TeamLabelBox.TextChanged += (_, _) => TeamLabelPlaceholder.Visibility =
-            string.IsNullOrEmpty(TeamLabelBox.Text) ? Visibility.Visible : Visibility.Collapsed;
-
         // Apply AddCity button color from theme
         UpdateAddCityButtonColor();
+
+        // Hint TextBlock visibility — TextChanged fires on both user input and programmatic Text changes
+        CitySearchBox.TextChanged  += (_, _) => CitySearchHint.IsVisible  = string.IsNullOrEmpty(CitySearchBox.Text);
+        CityNameBox.TextChanged    += (_, _) => CityNameHint.IsVisible    = string.IsNullOrEmpty(CityNameBox.Text);
+        TeamLabelBox.TextChanged   += (_, _) => TeamLabelHint.IsVisible   = string.IsNullOrEmpty(TeamLabelBox.Text);
 
         // Pre-warm city database on a background thread so the first search is instant
         Task.Run(() => { _ = WorldCitySearchService.All; });
@@ -77,7 +77,7 @@ public partial class SettingsWindow : Window
     }
 
     // Theme selection
-    private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void ThemeComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (ThemeComboBox.SelectedItem is AppTheme selected)
         {
@@ -98,7 +98,7 @@ public partial class SettingsWindow : Window
     }
 
     // Opacity slider
-    private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    private void OpacitySlider_ValueChanged(object? sender, RangeBaseValueChangedEventArgs e)
     {
         _theme.Opacity = e.NewValue;
         UpdateOpacityLabel();
@@ -126,11 +126,9 @@ public partial class SettingsWindow : Window
 
     private CancellationTokenSource _settingsSearchCts = new();
 
-    private async void CitySearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    private async void CitySearchBox_TextChanged(object? sender, TextChangedEventArgs e)
     {
         var q = CitySearchBox.Text;
-        CitySearchPlaceholder.Visibility = string.IsNullOrEmpty(q)
-            ? Visibility.Visible : Visibility.Collapsed;
 
         if (string.IsNullOrWhiteSpace(q))
         {
@@ -155,14 +153,14 @@ public partial class SettingsWindow : Window
         CitySearchPopup.IsOpen     = matches.Count > 0;
     }
 
-    private void CitySearchBox_GotFocus(object sender, RoutedEventArgs e)
+    private void CitySearchBox_GotFocus(object? sender, GotFocusEventArgs e)
     {
         if (sender is TextBox tb) tb.SelectAll();
         if (!string.IsNullOrEmpty(CitySearchBox.Text))
         {
             var q = CitySearchBox.Text;
             _ = Task.Run(() => WorldCitySearchService.Search(q))
-                    .ContinueWith(t => Dispatcher.Invoke(() =>
+                    .ContinueWith(t => Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         CitySearchList.ItemsSource = t.Result;
                         CitySearchPopup.IsOpen     = t.Result.Count > 0;
@@ -170,7 +168,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void CitySearchBox_KeyDown(object sender, KeyEventArgs e)
+    private void CitySearchBox_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape)
         {
@@ -178,9 +176,8 @@ public partial class SettingsWindow : Window
             CitySearchBox.Clear();
             _lastQuickSearchEntry = null;
         }
-        else if (e.Key == Key.Enter && CitySearchList.Items.Count > 0)
+        else if (e.Key == Key.Return && CitySearchList.Items.Count > 0)
         {
-            // Select first result on Enter
             if (CitySearchList.Items[0] is CityEntry entry)
             {
                 CitySearchPopup.IsOpen = false;
@@ -189,7 +186,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void CitySearchList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void CitySearchList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (sender is ListBox lb && lb.SelectedItem is CityEntry entry)
         {
@@ -202,14 +199,13 @@ public partial class SettingsWindow : Window
     /// <summary>
     /// "+" button on a search result — adds directly to the clock list without going through the form.
     /// </summary>
-    private void AddCityFromSearch_Click(object sender, RoutedEventArgs e)
+    private void AddCityFromSearch_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: CityEntry entry })
         {
             e.Handled = true;  // don't also trigger SelectionChanged on the ListBox
             CitySearchPopup.IsOpen = false;
             CitySearchBox.Clear();
-            CitySearchPlaceholder.Visibility = Visibility.Visible;
             _lastQuickSearchEntry = null;
 
             if (!_vm.AddLocation(entry.City, entry.TimeZoneId, "Custom", entry.CountryFlag))
@@ -223,7 +219,6 @@ public partial class SettingsWindow : Window
         _lastQuickSearchEntry = entry;
 
         CitySearchBox.Text = $"{entry.CountryFlag} {entry.City}";
-        CitySearchPlaceholder.Visibility = Visibility.Collapsed;
 
         // Select matching country in the cascade
         CountryComboBox.SelectedItem = CountryComboBox.Items
@@ -246,30 +241,27 @@ public partial class SettingsWindow : Window
         catch { TimezoneBox.Text = entry.TimeZoneId; }
 
         CityNameBox.Text = entry.City;
-        CityNamePlaceholder.Visibility = Visibility.Collapsed;
     }
 
     // Cascading country → city → timezone selectors
-    private void CountryComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void CountryComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (CountryComboBox.SelectedItem is not string country) return;
 
         // User switched to cascade — discard any quick-search pre-fill
         _lastQuickSearchEntry = null;
         CitySearchBox.Clear();
-        CitySearchPlaceholder.Visibility = Visibility.Visible;
-
-        var cities = CityDatabase.CitiesForCountry(country);
-        CityComboBox.ItemsSource       = cities;
-        CityComboBox.DisplayMemberPath = "City";
-        CityComboBox.IsEnabled         = cities.Count > 0;
         CityComboBox.SelectedIndex     = -1;
         TimezoneBox.Text               = string.Empty;
         CityNameBox.Clear();
-        CityNamePlaceholder.Visibility = Visibility.Visible;
+
+        var cities = CityDatabase.CitiesForCountry(country);
+        CityComboBox.ItemsSource  = cities;
+        CityComboBox.IsEnabled    = cities.Count > 0;
+        CityComboBox.SelectedIndex = -1;
     }
 
-    private void CityComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void CityComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (CityComboBox.SelectedItem is not CityEntry entry) return;
 
@@ -286,13 +278,12 @@ public partial class SettingsWindow : Window
 
         // Auto-fill city name (user can still edit)
         CityNameBox.Text = entry.City;
-        CityNamePlaceholder.Visibility = Visibility.Collapsed;
     }
 
     // Add city
-    private void AddCityButton_Click(object sender, RoutedEventArgs e)
+    private void AddCityButton_Click(object? sender, RoutedEventArgs e)
     {
-        AddCityError.Visibility = Visibility.Collapsed;
+        AddCityError.IsVisible = false;
 
         // Accept a city from either the cascade selector OR the quick-search box
         CityEntry? entry = CityComboBox.SelectedItem as CityEntry ?? _lastQuickSearchEntry;
@@ -302,7 +293,7 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        var cityName  = CityNameBox.Text.Trim();
+        var cityName  = CityNameBox.Text?.Trim() ?? string.Empty;
         var teamLabel = string.IsNullOrWhiteSpace(TeamLabelBox.Text)
                             ? "Custom"
                             : TeamLabelBox.Text.Trim();
@@ -328,26 +319,17 @@ public partial class SettingsWindow : Window
         CityNameBox.Clear();
         TeamLabelBox.Clear();
         CitySearchBox.Clear();
-        CitySearchPlaceholder.Visibility = Visibility.Visible;
-        CityNamePlaceholder.Visibility   = Visibility.Visible;
     }
 
     private void ShowError(string message)
     {
-        AddCityError.Text       = message;
-        AddCityError.Visibility = Visibility.Visible;
+        AddCityError.Text      = message;
+        AddCityError.IsVisible = true;
     }
 
-    // Delete mode
-    private void DeleteModeToggle_Checked(object sender, RoutedEventArgs e)
+    private void DeleteModeToggle_IsCheckedChanged(object? sender, RoutedEventArgs e)
     {
-        _theme.DeleteMode = true;
-        UpdateDeleteToggleContent();
-    }
-
-    private void DeleteModeToggle_Unchecked(object sender, RoutedEventArgs e)
-    {
-        _theme.DeleteMode = false;
+        _theme.DeleteMode = DeleteModeToggle.IsChecked == true;
         UpdateDeleteToggleContent();
     }
 
@@ -357,8 +339,7 @@ public partial class SettingsWindow : Window
         DeleteModeToggle.Content = _theme.DeleteMode ? "Delete Mode: ON" : "Delete Mode: OFF";
     }
 
-    // Scale mode
-    private void ScaleMode_Changed(object sender, RoutedEventArgs e)
+    private void ScaleMode_Changed(object? sender, RoutedEventArgs e)
     {
         if (ProportionScaleRadio is null || MinLimitRadio is null) return;
         _theme.ScaleMode = ProportionScaleRadio.IsChecked == true
@@ -366,16 +347,9 @@ public partial class SettingsWindow : Window
             : ScaleMode.MinLimit;
     }
 
-    // Edit mode
-    private void EditModeToggle_Checked(object sender, RoutedEventArgs e)
+    private void EditModeToggle_IsCheckedChanged(object? sender, RoutedEventArgs e)
     {
-        _theme.EditMode = true;
-        UpdateEditToggleContent();
-    }
-
-    private void EditModeToggle_Unchecked(object sender, RoutedEventArgs e)
-    {
-        _theme.EditMode = false;
+        _theme.EditMode = EditModeToggle.IsChecked == true;
         UpdateEditToggleContent();
     }
 
@@ -385,16 +359,9 @@ public partial class SettingsWindow : Window
         EditModeToggle.Content = _theme.EditMode ? "Edit Mode: ON" : "Edit Mode: OFF";
     }
 
-    // Diagnostics window toggle
-    private void DiagnosticsToggle_Checked(object sender, RoutedEventArgs e)
+    private void DiagnosticsToggle_IsCheckedChanged(object? sender, RoutedEventArgs e)
     {
-        _theme.ShowDiagnostics = true;
-        UpdateDiagnosticsToggleContent();
-    }
-
-    private void DiagnosticsToggle_Unchecked(object sender, RoutedEventArgs e)
-    {
-        _theme.ShowDiagnostics = false;
+        _theme.ShowDiagnostics = DiagnosticsToggle.IsChecked == true;
         UpdateDiagnosticsToggleContent();
     }
 
@@ -406,16 +373,9 @@ public partial class SettingsWindow : Window
             : "Diagnostics Window: OFF";
     }
 
-    // Startup toggle
-    private void StartupToggle_Checked(object sender, RoutedEventArgs e)
+    private void StartupToggle_IsCheckedChanged(object? sender, RoutedEventArgs e)
     {
-        _theme.RunOnStartup = true;
-        UpdateStartupToggleContent();
-    }
-
-    private void StartupToggle_Unchecked(object sender, RoutedEventArgs e)
-    {
-        _theme.RunOnStartup = false;
+        _theme.RunOnStartup = StartupToggle.IsChecked == true;
         UpdateStartupToggleContent();
     }
 
@@ -454,5 +414,11 @@ public partial class SettingsWindow : Window
     }
 
     // Close
-    private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+    private void CloseButton_Click(object? sender, RoutedEventArgs e) => Close();
+
+    private void TitleBar_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            BeginMoveDrag(e);
+    }
 }

@@ -196,8 +196,7 @@ public class UtcApiTests
         if (doc is null) return;
 
         // Build location and refresh
-        var brush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Cyan);
-        brush.Freeze();
+        var brush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Colors.Cyan);
         var location = new ClockLocation
         {
             CityName    = "UTC",

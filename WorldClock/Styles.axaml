@@ -1,0 +1,135 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Global hover styles for flat buttons -->
+    <Style Selector="Button.flat">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.flat:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#22FFFFFF"/>
+    </Style>
+
+    <Style Selector="Button.win-ctrl">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Width" Value="46"/>
+        <Setter Property="Height" Value="32"/>
+    </Style>
+    <Style Selector="Button.win-ctrl:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#22FFFFFF"/>
+    </Style>
+
+    <Style Selector="Button.win-close">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Width" Value="46"/>
+        <Setter Property="Height" Value="32"/>
+    </Style>
+    <Style Selector="Button.win-close:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#C00C0C"/>
+    </Style>
+
+    <!-- Section card in settings window -->
+    <Style Selector="Border.section-card">
+        <Setter Property="Background"   Value="{DynamicResource BrushBackgroundCard}"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding"      Value="16,12"/>
+        <Setter Property="Margin"       Value="0,0,0,10"/>
+        <Setter Property="BoxShadow"    Value="0 2 12 0 #40000000"/>
+    </Style>
+
+    <!-- Input box (read-only or editable text fields) -->
+    <Style Selector="TextBox.input-box">
+        <Setter Property="Background"       Value="{DynamicResource BrushBackgroundMid}"/>
+        <Setter Property="Foreground"       Value="{DynamicResource BrushTextPrimary}"/>
+        <Setter Property="BorderBrush"      Value="{DynamicResource BrushSeparator}"/>
+        <Setter Property="BorderThickness"  Value="1"/>
+        <Setter Property="CornerRadius"     Value="6"/>
+        <Setter Property="Padding"          Value="10,5"/>
+        <Setter Property="FontSize"         Value="13"/>
+        <Setter Property="CaretBrush"       Value="{DynamicResource BrushAccentCyan}"/>
+        <Setter Property="Height"           Value="36"/>
+    </Style>
+    <!-- Prevent FluentTheme from overriding TextBox backgrounds on focus/hover -->
+    <Style Selector="TextBox.input-box /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource BrushBackgroundMid}"/>
+    </Style>
+    <Style Selector="TextBox.input-box:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource BrushBackgroundMid}"/>
+    </Style>
+    <Style Selector="TextBox.input-box:focus-within /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource BrushBackgroundMid}"/>
+    </Style>
+    <Style Selector="TextBox.input-box:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource BrushBackgroundMid}"/>
+    </Style>
+
+    <!-- Dark-background input (edit fields, settings search) -->
+    <Style Selector="TextBox.input-dark">
+        <Setter Property="Background"      Value="{DynamicResource BrushBackgroundDark}"/>
+        <Setter Property="Foreground"      Value="{DynamicResource BrushTextPrimary}"/>
+        <Setter Property="BorderBrush"     Value="{DynamicResource BrushSeparator}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CaretBrush"      Value="{DynamicResource BrushAccentCyan}"/>
+    </Style>
+    <Style Selector="TextBox.input-dark /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource BrushBackgroundDark}"/>
+    </Style>
+    <Style Selector="TextBox.input-dark:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource BrushBackgroundDark}"/>
+    </Style>
+    <Style Selector="TextBox.input-dark:focus-within /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource BrushBackgroundDark}"/>
+    </Style>
+    <Style Selector="TextBox.input-dark:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource BrushBackgroundDark}"/>
+    </Style>
+
+    <!-- Transparent search box (overlaid on its own styled container) -->
+    <Style Selector="TextBox.search-transparent">
+        <Setter Property="CaretBrush" Value="{DynamicResource BrushAccentCyan}"/>
+    </Style>
+    <Style Selector="TextBox.search-transparent /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.search-transparent:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.search-transparent:focus-within /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.search-transparent:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <!-- Primary action button (ADD, etc.) -->
+    <Style Selector="Button.primary">
+        <Setter Property="Background"   Value="{DynamicResource BrushAccentCyan}"/>
+        <Setter Property="Foreground"   Value="#0D0D1A"/>
+        <Setter Property="FontWeight"   Value="Bold"/>
+        <Setter Property="FontSize"     Value="13"/>
+        <Setter Property="Padding"      Value="16,8"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Cursor"       Value="Hand"/>
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#33E5FF"/>
+    </Style>
+
+    <!-- ListBoxItem highlight -->
+    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource BrushAccentCyan}"/>
+        <Setter Property="Foreground" Value="#0D1117"/>
+    </Style>
+    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#22FFFFFF"/>
+    </Style>
+
+</Styles>

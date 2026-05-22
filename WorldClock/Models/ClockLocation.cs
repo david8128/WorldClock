@@ -1,6 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows.Media;
+using Avalonia.Media;
 using WorldClock.Helpers;
 using WorldClock.Services;
 
@@ -25,6 +25,7 @@ public sealed class ClockLocation : INotifyPropertyChanged
     private string _editingCityName    = string.Empty;
     private string _editingCountryFlag = string.Empty;
     private string _editingTeamLabel   = string.Empty;    private string _editingAccentHex   = string.Empty;
+    private SolidColorBrush? _originalAccentBrush;   // saved on BeginEdit, restored on CancelEdit
     // ── Immutable identity ────────────────────────────────────────────────────
     public required string TimeZoneId { get; init; }
 
@@ -90,8 +91,22 @@ public sealed class ClockLocation : INotifyPropertyChanged
         set { _teamLabel = value; OnPropertyChanged(); }
     }
 
-    /// <summary>True when this is the UTC clock shown in the dedicated banner (cannot be moved or edited).</summary>
+    /// <summary>True when this is the UTC clock shown in the dedicated banner (cannot be moved or deleted).</summary>
     public bool IsUtc => TimeZoneId == "UTC";
+
+    /// <summary>True when the global Edit Mode is active. UTC cards are editable (name/flag/team/accent) but not deletable.</summary>
+    public bool IsEditVisible => ThemeService.Instance.EditMode;
+
+    /// <summary>True when the global Delete Mode is active and this card is not the UTC clock.</summary>
+    public bool IsDeleteVisible => !IsUtc && ThemeService.Instance.DeleteMode;
+
+    /// <summary>Called by <see cref="MainViewModel.NotifyModeChanged"/> when Edit/Delete mode toggles.
+    /// Raises PropertyChanged so card buttons re-evaluate <see cref="IsEditVisible"/> and <see cref="IsDeleteVisible"/>.</summary>
+    public void NotifyModeChanged()
+    {
+        OnPropertyChanged(nameof(IsEditVisible));
+        OnPropertyChanged(nameof(IsDeleteVisible));
+    }
 
     // ── Inline-edit state ─────────────────────────────────────────────────────
 
@@ -132,6 +147,7 @@ public sealed class ClockLocation : INotifyPropertyChanged
     /// <summary>Copies current values to scratch fields and enters edit mode.</summary>
     public void BeginEdit()
     {
+        _originalAccentBrush = AccentBrush;
         EditingCityName    = CityName;
         EditingCountryFlag = CountryFlag;
         EditingTeamLabel   = TeamLabel;
@@ -143,6 +159,7 @@ public sealed class ClockLocation : INotifyPropertyChanged
     /// <summary>Applies scratch fields back to the model and exits edit mode.</summary>
     public void CommitEdit()
     {
+        _originalAccentBrush = null;
         if (!string.IsNullOrWhiteSpace(EditingCityName))    CityName    = EditingCityName.Trim();
         if (!string.IsNullOrWhiteSpace(EditingCountryFlag)) CountryFlag = EditingCountryFlag.Trim();
         TeamLabel = EditingTeamLabel.Trim();   // allow empty team label
@@ -150,7 +167,7 @@ public sealed class ClockLocation : INotifyPropertyChanged
         {
             try
             {
-                var color = (Color)ColorConverter.ConvertFromString(EditingAccentHex);
+                var color = Color.Parse(EditingAccentHex);
                 AccentBrush = new SolidColorBrush(color);
             }
             catch { /* invalid hex — keep current brush */ }
@@ -159,7 +176,13 @@ public sealed class ClockLocation : INotifyPropertyChanged
     }
 
     /// <summary>Discards scratch fields and exits edit mode without changing data.</summary>
-    public void CancelEdit() => IsEditing = false;
+    public void CancelEdit()
+    {
+        if (_originalAccentBrush is not null)
+            AccentBrush = _originalAccentBrush;
+        _originalAccentBrush = null;
+        IsEditing = false;
+    }
 
     // ── Live-clock properties ─────────────────────────────────────────────────
 

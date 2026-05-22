@@ -1,4 +1,4 @@
-using System.Windows.Media;
+using Avalonia.Media;
 
 namespace WorldClock.Models;
 
@@ -26,13 +26,13 @@ public sealed class AppTheme
     public required Color Separator      { get; init; }
 
     // ── Pre-built brushes (derived) ───────────────────────────────────────────
-    public SolidColorBrush BrushBackgroundDark => Freeze(new SolidColorBrush(BackgroundDark));
-    public SolidColorBrush BrushBackgroundMid  => Freeze(new SolidColorBrush(BackgroundMid));
-    public SolidColorBrush BrushBackgroundCard => Freeze(new SolidColorBrush(BackgroundCard));
-    public SolidColorBrush BrushTextPrimary    => Freeze(new SolidColorBrush(TextPrimary));
-    public SolidColorBrush BrushTextDim        => Freeze(new SolidColorBrush(TextDim));
-    public SolidColorBrush BrushAccentPrimary  => Freeze(new SolidColorBrush(AccentPrimary));
-    public SolidColorBrush BrushSeparator      => Freeze(new SolidColorBrush(Separator));
+    public SolidColorBrush BrushBackgroundDark => new SolidColorBrush(BackgroundDark);
+    public SolidColorBrush BrushBackgroundMid  => new SolidColorBrush(BackgroundMid);
+    public SolidColorBrush BrushBackgroundCard => new SolidColorBrush(BackgroundCard);
+    public SolidColorBrush BrushTextPrimary    => new SolidColorBrush(TextPrimary);
+    public SolidColorBrush BrushTextDim        => new SolidColorBrush(TextDim);
+    public SolidColorBrush BrushAccentPrimary  => new SolidColorBrush(AccentPrimary);
+    public SolidColorBrush BrushSeparator      => new SolidColorBrush(Separator);
 
     /// <summary>
     /// True when the theme background is perceived as dark.
@@ -52,7 +52,6 @@ public sealed class AppTheme
 
     public override string ToString() => Name;
 
-    private static SolidColorBrush Freeze(SolidColorBrush b) { b.Freeze(); return b; }
 
     // ── Built-in themes ───────────────────────────────────────────────────────
 
@@ -181,5 +180,5 @@ public sealed class AppTheme
         },
     ];
 
-    private static Color C(string hex) => (Color)ColorConverter.ConvertFromString(hex);
+    private static Color C(string hex) => Color.Parse(hex);
 }

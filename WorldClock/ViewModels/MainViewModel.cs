@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows.Media;
-using System.Windows.Threading;
+using Avalonia.Media;
+using Avalonia.Threading;
 using WorldClock.Helpers;
 using WorldClock.Models;
 using WorldClock.Services;
@@ -27,16 +27,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// theme-adjusted brush used for display in the colour picker swatches.</summary>
     public sealed record AccentEntry(string Hex, SolidColorBrush Display);
 
-    /// <summary>The accent palette entries pre-themed for the active theme.
-    /// In light mode the swatch colours are darkened (same 70 % HSV-Value transform
-    /// as <see cref="ClockLocation.ThemedAccentBrush"/>) so they remain readable.
-    /// Raises <see cref="PropertyChanged"/> automatically when the active theme changes.</summary>
+    /// <summary>The accent palette entries pre-themed for the active theme.</summary>
     public IReadOnlyList<AccentEntry> ThemedAccentPalette =>
         AccentPalette.Select(hex =>
         {
-            var color    = (Color)ColorConverter.ConvertFromString(hex);
+            var color    = Color.Parse(hex);
             var rawBrush = new SolidColorBrush(color);
-            rawBrush.Freeze();
             var display  = ThemeColorHelper.ThemedBrush(rawBrush);
             return new AccentEntry(hex, display);
         }).ToList();
@@ -62,8 +58,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string HomeLocationId
     {
         get => _homeLocationId;
-        private set { _homeLocationId = value; OnPropertyChanged(); }
+        private set { _homeLocationId = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsUtcHome)); }
     }
+
+    /// <summary>True when UTC is the current home location. Bound by the UTC banner toggle button.</summary>
+    public bool IsUtcHome => _homeLocationId == "UTC";
+
+    /// <summary>Resolves a timezone ID to a <see cref="TimeZoneInfo"/>.
+    /// Returns <see cref="TimeZoneInfo.Utc"/> directly for "UTC" so the static
+    /// well-known instance is always used regardless of OS timezone database.
+    /// </summary>
+    private static TimeZoneInfo LookupTz(string id) =>
+        id == "UTC" ? TimeZoneInfo.Utc : TimeZoneInfo.FindSystemTimeZoneById(id);
 
     // ── Clock panel layout (compact vertical / expanded wrap) ─────────────────
 
@@ -100,8 +106,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
         else
         {
             // ── Restore saved city list ────────────────────────────────────────
-            // UTC is always first and implicit — add it unconditionally.
-            Add("UTC / GMT", "🌐", "UTC", "Universal Time");
+            // UTC is always first — restore any user-customized label, flag, or accent.
+            var utcData = saved.Cities.FirstOrDefault(c => c.TimeZoneId == "UTC");
+            Add(utcData?.CityName    ?? "UTC / GMT",
+                utcData?.CountryFlag ?? "🌐",
+                "UTC",
+                utcData?.TeamLabel   ?? "Universal Time",
+                string.IsNullOrEmpty(utcData?.AccentHex) ? null : utcData?.AccentHex);
             foreach (var city in saved.Cities)
             {
                 // Skip UTC (already added) and skip cities with invalid timezone IDs.
@@ -121,7 +132,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshHomeDiffs();
         if (!string.IsNullOrEmpty(_homeLocationId))
         {
-            try   { Translator.SetHomeZone(TimeZoneInfo.FindSystemTimeZoneById(_homeLocationId)); }
+            try   { Translator.SetHomeZone(LookupTz(_homeLocationId)); }
             catch { /* invalid saved ID — leave home zone unset */ }
         }
 
@@ -160,6 +171,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                             string flag = "🏙️")
     {
         if (string.IsNullOrWhiteSpace(cityName)) return false;
+        if (tzId == "UTC") return false;  // UTC is always the first fixed card; search sets visualizer source only
         // Normalise "City, State" → "City" (e.g. "New York, New York" → "New York")
         var comma = cityName.IndexOf(',');
         cityName = (comma > 0 ? cityName[..comma] : cityName).Trim();
@@ -172,6 +184,20 @@ public sealed class MainViewModel : INotifyPropertyChanged
         return true;
     }
 
+    // ── Mode change propagation ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Called by MainWindow when Edit or Delete mode toggles.
+    /// Notifies every <see cref="ClockLocation"/> so their <c>IsEditVisible</c> /
+    /// <c>IsDeleteVisible</c> computed properties fire PropertyChanged and the
+    /// card buttons update immediately without rebuilding the entire item list.
+    /// </summary>
+    public void NotifyModeChanged()
+    {
+        foreach (var loc in Locations)
+            loc.NotifyModeChanged();
+    }
+
     // ── Persistence ──────────────────────────────────────────────────────────
 
     /// <summary>
@@ -182,7 +208,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         var saved = _store.Load();
         saved.Cities = Locations
-            .Where(l => l.TimeZoneId != "UTC")
             .Select(l => new SavedCity
             {
                 CityName    = l.CityName,
@@ -204,7 +229,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         HomeLocationId = location.TimeZoneId;
         foreach (var loc in Locations) loc.IsHome = loc.TimeZoneId == location.TimeZoneId;
         RefreshHomeDiffs();
-        try   { Translator.SetHomeZone(TimeZoneInfo.FindSystemTimeZoneById(location.TimeZoneId)); }
+        try   { Translator.SetHomeZone(LookupTz(location.TimeZoneId)); }
         catch { Translator.SetHomeZone(null); }
         PersistCities();
     }
@@ -228,7 +253,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (string.IsNullOrEmpty(_homeLocationId)) return;
         try
         {
-            var homeTz  = TimeZoneInfo.FindSystemTimeZoneById(_homeLocationId);
+            var homeTz  = LookupTz(_homeLocationId);
             var nowUtc  = DateTime.UtcNow;
             var homeOff = homeTz.GetUtcOffset(nowUtc);
 
@@ -279,9 +304,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         var hex = accentHex ?? AccentPalette[_accentIndex % AccentPalette.Count];
         if (accentHex is null) _accentIndex++;
-        var color  = (Color)ColorConverter.ConvertFromString(hex);
+        var color  = Color.Parse(hex);
         var brush  = new SolidColorBrush(color);
-        brush.Freeze();
         var loc = new ClockLocation
         {
             CityName    = city,

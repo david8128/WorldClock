@@ -1,7 +1,8 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows;
-using System.Windows.Media;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
 using WorldClock.Helpers;
 using WorldClock.Models;
 
@@ -137,10 +138,10 @@ public sealed class ThemeService : INotifyPropertyChanged
 
     public void Apply()
     {
-        // Guard: in unit-test processes there is no running WPF Application
+        // Guard: in unit-test processes there is no running Avalonia Application
         if (Application.Current is null) return;
 
-        var res = Application.Current.Resources;
+        var res = (Application.Current.Resources as ResourceDictionary)!;
 
         // Text and accent brushes are always fully opaque
         SetBrush(res, "BrushTextPrimary", _theme.TextPrimary);
@@ -161,28 +162,28 @@ public sealed class ThemeService : INotifyPropertyChanged
         res["CardShadowOpacity"]  = _theme.IsDark ? 0.55 : 0.20;
         // Card shadow color: dark for light themes, black for dark themes
         var shadowColor = _theme.IsDark
-            ? System.Windows.Media.Color.FromRgb(0, 0, 0)
-            : System.Windows.Media.Color.FromRgb(0, 0, 0);
+            ? Color.FromRgb(0, 0, 0)
+            : Color.FromRgb(0, 0, 0);
         res["CardShadowColor"] = shadowColor;
 
         // DST active badge: bright yellow on dark backgrounds, readable dark-amber on light.
         var dstColor = _theme.IsDark
-            ? System.Windows.Media.Color.FromRgb(0xFF, 0xD6, 0x00)   // #FFD600
-            : System.Windows.Media.Color.FromRgb(0x92, 0x40, 0x00);  // #924000 — visible on white
+            ? Color.FromRgb(0xFF, 0xD6, 0x00)   // #FFD600
+            : Color.FromRgb(0x92, 0x40, 0x00);  // #924000
         SetBrush(res, "BrushDstActive", dstColor);
 
         // UTC banner gradient: dark navy on dark themes, neutral card surface on light.
         if (_theme.IsDark)
         {
-            res["BannerGradientStart"] = System.Windows.Media.Color.FromArgb(0xBB, 0x0A, 0x16, 0x28);
-            res["BannerGradientEnd"]   = System.Windows.Media.Color.FromArgb(0xBB, 0x00, 0x33, 0x66);
+            res["BannerGradientStart"] = Color.FromArgb(0xBB, 0x0A, 0x16, 0x28);
+            res["BannerGradientEnd"]   = Color.FromArgb(0xBB, 0x00, 0x33, 0x66);
         }
         else
         {
             var bm = _theme.BackgroundMid;
             var bd = _theme.BackgroundDark;
-            res["BannerGradientStart"] = System.Windows.Media.Color.FromArgb(0xFF, bm.R, bm.G, bm.B);
-            res["BannerGradientEnd"]   = System.Windows.Media.Color.FromArgb(0xFF, bd.R, bd.G, bd.B);
+            res["BannerGradientStart"] = Color.FromArgb(0xFF, bm.R, bm.G, bm.B);
+            res["BannerGradientEnd"]   = Color.FromArgb(0xFF, bd.R, bd.G, bd.B);
         }
 
         // Background brushes respect the current opacity setting
@@ -193,7 +194,7 @@ public sealed class ThemeService : INotifyPropertyChanged
     {
         if (Application.Current is null) return;
 
-        var res   = Application.Current.Resources;
+        var res   = (Application.Current.Resources as ResourceDictionary)!;
         // Cap at MaxBackgroundAlpha (~43 %) so the window is always at least 57 %
         // transparent. Using 255 (fully opaque) would cover the compositor blur completely.
         var alpha = AcrylicHelper.ToBackgroundAlpha(_opacity);
@@ -210,32 +211,22 @@ public sealed class ThemeService : INotifyPropertyChanged
 
     private static void SetBrush(ResourceDictionary res, string key, Color color)
     {
-        if (!res.Contains(key)) return;
-        var brush = new SolidColorBrush(color);
-        brush.Freeze();
-        res[key] = brush;
+        res[key] = new SolidColorBrush(color);
     }
 
-    /// <summary>Replaces a brush resource with one that has a modified alpha channel.</summary>
     private static void SetBrushAlpha(ResourceDictionary res, string key, Color baseColor, byte alpha)
     {
-        if (!res.Contains(key)) return;
-        var c = Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B);
-        var brush = new SolidColorBrush(c);
-        brush.Freeze();
-        res[key] = brush;
+        res[key] = new SolidColorBrush(Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B));
     }
 
     private static void SetColor(ResourceDictionary res, string key, Color color)
     {
-        if (res.Contains(key))
-            res[key] = color;
+        res[key] = color;
     }
 
     private static void SetColorAlpha(ResourceDictionary res, string key, Color baseColor, byte alpha)
     {
-        if (res.Contains(key))
-            res[key] = Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B);
+        res[key] = Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

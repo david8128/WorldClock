@@ -1,4 +1,4 @@
-using System.Windows.Media;
+using Avalonia.Media;
 using WorldClock.Services;
 
 namespace WorldClock.Helpers;
@@ -25,7 +25,6 @@ public static class ThemeColorHelper
         // 70 % of the original Value — distinct, visible on white, never fully black
         var light = HsvToRgbColor(accent.Color.A, h, s, v * 0.70);
         var b = new SolidColorBrush(light);
-        b.Freeze();
         return b;
     }
 

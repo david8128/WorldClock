@@ -25,7 +25,7 @@ ARCH="amd64"
 # ── Parse arguments ───────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --version)      VERSION="$2"; shift 2 ;;
+        --version)      VERSION="${2//$'\r'/}"; shift 2 ;;
         --skip-publish) SKIP_PUBLISH=true; shift ;;
         --help)
             echo "Usage: build-linux-deb.sh [--version X.Y.Z] [--skip-publish]"
@@ -53,9 +53,7 @@ if [ "$SKIP_PUBLISH" = false ]; then
         -c Release \
         -r win-x64 \
         --self-contained true \
-        -p:PublishSingleFile=true \
-        -p:IncludeNativeLibrariesForSelfExtract=true \
-        "-p:Version=$VERSION" \
+        "-p:VersionPrefix=$VERSION" \
         -o "$PUBLISH_DIR" \
         --nologo
 else

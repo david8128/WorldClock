@@ -1,6 +1,6 @@
 using System.Globalization;
-using System.Windows.Data;
-using System.Windows.Media;
+using Avalonia.Data.Converters;
+using Avalonia.Media;
 
 namespace WorldClock.Helpers;
 
@@ -8,7 +8,6 @@ namespace WorldClock.Helpers;
 /// Converts a hex colour string (e.g. "#00E5FF") to a frozen <see cref="SolidColorBrush"/>.
 /// Returns <see cref="Brushes.Transparent"/> for null, empty, or invalid values.
 /// </summary>
-[ValueConversion(typeof(string), typeof(SolidColorBrush))]
 public sealed class HexStringToBrushConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -17,10 +16,8 @@ public sealed class HexStringToBrushConverter : IValueConverter
             return Brushes.Transparent;
         try
         {
-            var color = (Color)ColorConverter.ConvertFromString(hex);
-            var brush = new SolidColorBrush(color);
-            brush.Freeze();
-            return brush;
+            var color = Color.Parse(hex);
+            return new SolidColorBrush(color);
         }
         catch
         {

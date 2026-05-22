@@ -11,7 +11,7 @@ public class CityManagementTests
 {
     // ── AddLocation ───────────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void AddLocation_ValidCityAndTz_IncreasesLocationCount()
     {
         var vm     = TestViewModel.Fresh();
@@ -23,7 +23,7 @@ public class CityManagementTests
         vm.Locations.Should().HaveCount(before + 1);
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_ValidCity_AppearsInLocations()
     {
         var vm = TestViewModel.Fresh();
@@ -32,7 +32,7 @@ public class CityManagementTests
         vm.Locations.Should().Contain(l => l.CityName == "Berlin");
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_EmptyCityName_ReturnsFalse()
     {
         var vm     = TestViewModel.Fresh();
@@ -44,21 +44,21 @@ public class CityManagementTests
         vm.Locations.Should().HaveCount(before);
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_WhitespaceCityName_ReturnsFalse()
     {
         var vm = TestViewModel.Fresh();
         vm.AddLocation("   ", "W. Europe Standard Time").Should().BeFalse();
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_InvalidTimezoneId_ReturnsFalse()
     {
         var vm = TestViewModel.Fresh();
         vm.AddLocation("BadCity", "Totally/Invalid").Should().BeFalse();
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_DuplicateCityName_ReturnsFalse()
     {
         var vm = TestViewModel.Fresh();
@@ -66,7 +66,7 @@ public class CityManagementTests
         vm.AddLocation("London", "GMT Standard Time").Should().BeFalse();
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_CityStateFormat_NormalizesToCityName()
     {
         // "New York, New York" should be stored as "New York" and treated as duplicate of "New York".
@@ -74,7 +74,7 @@ public class CityManagementTests
         vm.AddLocation("New York, New York", "Eastern Standard Time").Should().BeFalse(); // duplicate of default "New York"
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_CityStateFormat_StoredWithoutState()
     {
         // "Seattle, Washington" → stored as "Seattle", not "Seattle, Washington"
@@ -84,7 +84,7 @@ public class CityManagementTests
         vm.Locations.Should().NotContain(l => l.CityName == "Seattle, Washington");
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_SameTimezone_DifferentCityName_Succeeds()
     {
         // Rome and Milan share "W. Europe Standard Time" — both must be addable.
@@ -95,7 +95,7 @@ public class CityManagementTests
         vm.Locations.Should().Contain(l => l.CityName == "Rome");
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_SetsTeamLabel_Correctly()
     {
         var vm = TestViewModel.Fresh();
@@ -105,7 +105,7 @@ public class CityManagementTests
         loc!.TeamLabel.Should().Be("NZ Team");
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_DefaultTeamLabel_IsCustom()
     {
         var vm = TestViewModel.Fresh();
@@ -115,7 +115,7 @@ public class CityManagementTests
         loc.TeamLabel.Should().Be("Custom");
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_NewLocation_HasValidCurrentTime()
     {
         var vm = TestViewModel.Fresh();
@@ -125,7 +125,7 @@ public class CityManagementTests
         loc.CurrentTime.Should().MatchRegex(@"^\d{2}:\d{2}:\d{2}$");
     }
 
-    [StaFact]
+    [Fact]
     public void AddLocation_NewLocation_HasNonNullAccentBrush()
     {
         var vm = TestViewModel.Fresh();
@@ -137,7 +137,7 @@ public class CityManagementTests
 
     // ── RemoveLocation ────────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void RemoveLocation_ExistingCity_DecreasesCount()
     {
         var vm  = TestViewModel.Fresh();
@@ -150,7 +150,7 @@ public class CityManagementTests
         vm.Locations.Should().HaveCount(before - 1);
     }
 
-    [StaFact]
+    [Fact]
     public void RemoveLocation_ExistingCity_RemovedFromList()
     {
         var vm  = TestViewModel.Fresh();
@@ -161,7 +161,7 @@ public class CityManagementTests
         vm.Locations.Should().NotContain(l => l.CityName == "Tokyo");
     }
 
-    [StaFact]
+    [Fact]
     public void RemoveLocation_UtcEntry_ReturnsFalse()
     {
         var vm  = TestViewModel.Fresh();
@@ -173,12 +173,11 @@ public class CityManagementTests
         vm.Locations.Should().Contain(l => l.TimeZoneId == "UTC");
     }
 
-    [StaFact]
+    [Fact]
     public void RemoveLocation_NonExistentLocation_ReturnsFalse()
     {
         var vm = TestViewModel.Fresh();
-        var brush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Red);
-        brush.Freeze();
+        var brush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Colors.Red);
         var ghost = new ClockLocation
         {
             CityName    = "Ghost",
@@ -194,21 +193,21 @@ public class CityManagementTests
 
     // ── AllTimeZones ──────────────────────────────────────────────────────────
 
-    [StaFact]
+    [Fact]
     public void AllTimeZones_IsNotEmpty()
     {
         var vm = TestViewModel.Fresh();
         vm.AllTimeZones.Should().NotBeEmpty();
     }
 
-    [StaFact]
+    [Fact]
     public void AllTimeZones_ContainsUtc()
     {
         var vm = TestViewModel.Fresh();
         vm.AllTimeZones.Should().Contain(z => z.Id == "UTC");
     }
 
-    [StaFact]
+    [Fact]
     public void AllTimeZones_AreOrderedByBaseOffset()
     {
         var vm      = TestViewModel.Fresh();

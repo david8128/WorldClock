@@ -1,0 +1,57 @@
+<Window x:Class="WorldClock.DiagnosticsWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="WorldClock — Diagnostics"
+        Width="640" Height="140"
+        MinWidth="400" MinHeight="80"
+        SystemDecorations="None"
+        Background="Transparent"
+        Topmost="True"
+        WindowStartupLocation="Manual">
+
+    <Border Background="#E5000000"
+            BorderBrush="#44FFFF00"
+            BorderThickness="1"
+            PointerPressed="TitleBar_PointerPressed">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="22"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Title bar / drag handle -->
+            <Grid Grid.Row="0" Background="#33FFFF00">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="⚙ DIAGNOSTICS"
+                           FontFamily="Consolas" FontSize="10" FontWeight="Bold"
+                           Foreground="#FFFF00"
+                           VerticalAlignment="Center"
+                           Margin="8,0,0,0"/>
+                <Button Grid.Column="1"
+                        Content="✕"
+                        Width="28" Height="22"
+                        BorderThickness="0"
+                        Background="Transparent"
+                        Foreground="#FFFF00"
+                        FontSize="11"
+                        Cursor="Hand"
+                        Click="CloseButton_Click"/>
+            </Grid>
+
+            <!-- Diagnostics content -->
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <TextBlock Text="{Binding Translator.DiagStatus}"
+                           FontFamily="Consolas" FontSize="9"
+                           Foreground="#FFFF00"
+                           TextWrapping="Wrap"
+                           Margin="8,4"/>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>

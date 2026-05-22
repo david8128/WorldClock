@@ -1,4 +1,4 @@
-using System.Windows.Media;
+using Avalonia.Media;
 
 namespace WorldClock.Models;
 
@@ -14,9 +14,7 @@ public sealed class TranslatedTime
     static TranslatedTime()
     {
         DstActiveBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD6, 0x00));
-        DstActiveBrush.Freeze();
         StdBrush = new SolidColorBrush(Color.FromRgb(0x78, 0x90, 0x9C));
-        StdBrush.Freeze();
     }
 
     public required string          CityName    { get; init; }

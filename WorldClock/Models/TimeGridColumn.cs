@@ -26,6 +26,9 @@ public sealed class TimeGridColumn : INotifyPropertyChanged
     /// <summary>"am" or "pm" portion of the slot label. Empty on :30 slots or midnight.</summary>
     public string SlotAmPm => (!IsMidnight && SlotLabel.Length > 0) ? (SlotLabel[^1] == 'a' ? "am" : "pm") : "";
 
+    /// <summary>True for on-the-hour slots that are NOT midnight (used to show regular hour labels, not day/date labels).</summary>
+    public bool IsNonMidnightHourStart => IsHourStart && !IsMidnight;
+
     // INPC IsSelected so the column header highlights when in the selection window
     private bool _isSelected;
     public bool IsSelected

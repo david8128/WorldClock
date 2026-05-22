@@ -1,0 +1,230 @@
+<Window x:Class="WorldClock.SettingsWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" Height="700" Width="540"
+        MinHeight="560" MinWidth="480"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Segoe UI"
+        Background="Transparent"
+        SystemDecorations="None"
+        x:Name="SettingsRoot">
+
+    <Border Background="{DynamicResource BrushBackgroundMid}"
+            BorderBrush="{DynamicResource BrushSeparator}"
+            BorderThickness="1"
+            CornerRadius="10">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Title bar -->
+            <Grid Grid.Row="0"
+                  Background="{DynamicResource BrushBackgroundDark}"
+                  Height="48"
+                  PointerPressed="TitleBar_PointerPressed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="⚙  SETTINGS"
+                           FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                           Foreground="{DynamicResource BrushAccentCyan}"
+                           VerticalAlignment="Center" Margin="20,0,0,0"/>
+                <Button Grid.Column="1"
+                        Content="✕" Width="46" Height="36"
+                        BorderThickness="0" Background="Transparent"
+                        Foreground="{DynamicResource BrushTextPrimary}"
+                        FontSize="14" Cursor="Hand"
+                        Click="CloseButton_Click"/>
+            </Grid>
+
+            <!-- Scrollable content -->
+            <ScrollViewer Grid.Row="1" Padding="16,12,16,16"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="10">
+
+                    <!-- THEME -->
+                    <Border Background="{DynamicResource BrushBackgroundCard}"
+                            CornerRadius="10" Padding="16,14">
+                        <StackPanel>
+                            <TextBlock Text="THEME &amp; APPEARANCE" Classes="SectionTitle"
+                                       FontFamily="Consolas" FontSize="10" FontWeight="Bold"
+                                       Foreground="{DynamicResource BrushAccentCyan}" Margin="0,0,0,10"/>
+                            <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+                                <TextBlock Grid.Column="0" Text="Theme:" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource BrushTextPrimary}" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="ThemeComboBox" Grid.Column="1"
+                                          SelectionChanged="ThemeComboBox_SelectionChanged"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,4">
+                                <TextBlock Grid.Column="0" Text="Opacity:" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource BrushTextPrimary}" Margin="0,0,10,0"/>
+                                <Slider x:Name="OpacitySlider" Grid.Column="1"
+                                        Minimum="0.10" Maximum="1.0" TickFrequency="0.05"
+                                        IsSnapToTickEnabled="True"/>
+                                <TextBlock x:Name="OpacityLabel" Grid.Column="2"
+                                           VerticalAlignment="Center" Margin="10,0,0,0" Width="42"
+                                           Foreground="{DynamicResource BrushTextPrimary}"/>
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,6,0,0">
+                                <RadioButton x:Name="ProportionScaleRadio" IsChecked="True"
+                                             Content="Proportion Scale (auto-fit)"
+                                             Foreground="{DynamicResource BrushTextPrimary}"
+                                             Click="ScaleMode_Changed"/>
+                                <RadioButton x:Name="MinLimitRadio"
+                                             Content="Min-Limit (scrollbars)"
+                                             Foreground="{DynamicResource BrushTextPrimary}"
+                                             Click="ScaleMode_Changed"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ADD CITY -->
+                    <Border Background="{DynamicResource BrushBackgroundCard}"
+                            CornerRadius="10" Padding="16,14">
+                        <StackPanel>
+                            <TextBlock Text="ADD CITY" FontFamily="Consolas" FontSize="10"
+                                       FontWeight="Bold" Foreground="{DynamicResource BrushAccentCyan}"
+                                       Margin="0,0,0,10"/>
+
+                            <!-- Quick city search -->
+                            <Grid Margin="0,0,0,8">
+                                <TextBox x:Name="CitySearchBox"
+                                         Classes="input-dark"
+                                         Background="{DynamicResource BrushBackgroundDark}"
+                                         Foreground="{DynamicResource BrushTextPrimary}"
+                                         BorderBrush="{DynamicResource BrushSeparator}"
+                                         TextChanged="CitySearchBox_TextChanged"
+                                         GotFocus="CitySearchBox_GotFocus"
+                                         KeyDown="CitySearchBox_KeyDown"/>
+                                <TextBlock x:Name="CitySearchHint"
+                                           Text="Search city, country or UTC offset…"
+                                           IsHitTestVisible="False"
+                                           VerticalAlignment="Center" Margin="10,0,0,0"
+                                           Opacity="0.4"
+                                           Foreground="{DynamicResource BrushTextPrimary}"/>
+
+                                <Popup x:Name="CitySearchPopup" Placement="Bottom"
+                                       PlacementTarget="{Binding ElementName=CitySearchBox}">
+                                    <Border Background="{DynamicResource BrushBackgroundMid}"
+                                            BorderBrush="{DynamicResource BrushAccentCyan}"
+                                            BorderThickness="1" MaxHeight="200">
+                                        <ListBox x:Name="CitySearchList"
+                                                 Background="{DynamicResource BrushBackgroundMid}"
+                                                 SelectionChanged="CitySearchList_SelectionChanged">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding SearchLabel}"
+                                                               FontFamily="{StaticResource EmojiFontFamily}"
+                                                               Foreground="{DynamicResource BrushTextPrimary}"/>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+
+                            <!-- Cascade selectors -->
+                            <Grid ColumnDefinitions="*,*" Margin="0,0,0,6">
+                                <ComboBox x:Name="CountryComboBox" Grid.Column="0" Margin="0,0,4,0"
+                                          PlaceholderText="Country"
+                                          SelectionChanged="CountryComboBox_SelectionChanged"/>
+                                <ComboBox x:Name="CityComboBox" Grid.Column="1" Margin="4,0,0,0"
+                                          IsEnabled="False"
+                                          SelectionChanged="CityComboBox_SelectionChanged"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,6">
+                                <TextBox x:Name="TimezoneBox" IsReadOnly="True"
+                                         Background="{DynamicResource BrushBackgroundDark}"
+                                         Foreground="{DynamicResource BrushTextDim}"
+                                         BorderBrush="{DynamicResource BrushSeparator}"
+                                         Watermark="Timezone (auto-filled)"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,6">
+                                <TextBox x:Name="CityNameBox"
+                                         Background="{DynamicResource BrushBackgroundDark}"
+                                         Foreground="{DynamicResource BrushTextPrimary}"
+                                         BorderBrush="{DynamicResource BrushSeparator}"/>
+                                <TextBlock x:Name="CityNameHint"
+                                           Text="Display name"
+                                           IsHitTestVisible="False"
+                                           VerticalAlignment="Center" Margin="10,0,0,0"
+                                           Opacity="0.4"
+                                           Foreground="{DynamicResource BrushTextPrimary}"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
+                                <TextBox x:Name="TeamLabelBox"
+                                         Background="{DynamicResource BrushBackgroundDark}"
+                                         Foreground="{DynamicResource BrushTextPrimary}"
+                                         BorderBrush="{DynamicResource BrushSeparator}"/>
+                                <TextBlock x:Name="TeamLabelHint"
+                                           Text="Team label (optional)"
+                                           IsHitTestVisible="False"
+                                           VerticalAlignment="Center" Margin="10,0,0,0"
+                                           Opacity="0.4"
+                                           Foreground="{DynamicResource BrushTextPrimary}"/>
+                            </Grid>
+
+                            <Button x:Name="AddCityButton" Content="＋ Add City"
+                                    HorizontalAlignment="Right"
+                                    Padding="18,7" BorderThickness="0"
+                                    Foreground="Black" FontWeight="SemiBold"
+                                    Cursor="Hand"
+                                    Click="AddCityButton_Click"/>
+
+                            <TextBlock x:Name="AddCityError" IsVisible="False"
+                                       Foreground="#FF5555" FontSize="11"
+                                       TextWrapping="Wrap" Margin="0,6,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- MODES -->
+                    <Border Background="{DynamicResource BrushBackgroundCard}"
+                            CornerRadius="10" Padding="16,14">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="MODES" FontFamily="Consolas" FontSize="10"
+                                       FontWeight="Bold" Foreground="{DynamicResource BrushAccentCyan}"
+                                       Margin="0,0,0,2"/>
+                            <ToggleButton x:Name="DeleteModeToggle"
+                                          Content="Delete Mode: OFF"
+                                          HorizontalAlignment="Stretch"
+                                          IsCheckedChanged="DeleteModeToggle_IsCheckedChanged"/>
+                            <ToggleButton x:Name="EditModeToggle"
+                                          Content="Edit Mode: OFF"
+                                          HorizontalAlignment="Stretch"
+                                          IsCheckedChanged="EditModeToggle_IsCheckedChanged"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- SYSTEM -->
+                    <Border Background="{DynamicResource BrushBackgroundCard}"
+                            CornerRadius="10" Padding="16,14">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="SYSTEM" FontFamily="Consolas" FontSize="10"
+                                       FontWeight="Bold" Foreground="{DynamicResource BrushAccentCyan}"
+                                       Margin="0,0,0,2"/>
+                            <ToggleButton x:Name="DiagnosticsToggle"
+                                          Content="Diagnostics Window: OFF"
+                                          HorizontalAlignment="Stretch"
+                                          IsCheckedChanged="DiagnosticsToggle_IsCheckedChanged"/>
+                            <ToggleButton x:Name="StartupToggle"
+                                          Content="Start on Login: OFF"
+                                          HorizontalAlignment="Stretch"
+                                          IsCheckedChanged="StartupToggle_IsCheckedChanged"/>
+                            <TextBlock x:Name="StartupStatusLabel"
+                                       FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource BrushTextDim}"/>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>

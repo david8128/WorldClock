@@ -1,33 +1,62 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AssemblyName>WorldClock</AssemblyName>
     <RootNamespace>WorldClock</RootNamespace>
-    <!-- Embeds Logo.ico into the .exe so Windows shows it in the taskbar and process list -->
-    <ApplicationIcon>Images\Logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <Resource Include="Images\Logo.ico"/>
-    <Resource Include="Images\Logo.png"/>
+    <AvaloniaResource Include="Images/Logo.ico"/>
+    <AvaloniaResource Include="Images/Logo.png"/>
+    <AvaloniaResource Include="Assets/Fonts/NotoColorEmoji.ttf"/>
   </ItemGroup>
 
-  <!-- Exclude Python virtual environment (contains Linux symlinks unresolvable on Windows) -->
+  <!--
+    Workaround for Avalonia 11.2.3 + .NET 10 Windows build issue:
+    AvaloniaBuildTasks.props adds "**\*.axaml" as AvaloniaXaml in a static
+    ItemGroup, but on Windows the glob reaches GenerateAvaloniaResourcesTask
+    as a literal path ("…\WorldClock\**\*.axaml"), causing an IOException.
+    Solution: wipe the auto-glob items and enumerate the files explicitly.
+  -->
+  <ItemGroup>
+    <AvaloniaXaml Remove="@(AvaloniaXaml)" />
+    <AvaloniaXaml Include="App.axaml"              SubType="Designer" />
+    <AvaloniaXaml Include="MainWindow.axaml"       SubType="Designer" />
+    <AvaloniaXaml Include="SettingsWindow.axaml"   SubType="Designer" />
+    <AvaloniaXaml Include="DiagnosticsWindow.axaml" SubType="Designer" />
+    <AvaloniaXaml Include="Styles.axaml"           SubType="Designer" />
+  </ItemGroup>
+
+  <!-- Exclude Python virtual environment -->
   <ItemGroup>
     <Compile Remove="citiesdb\**"/>
-    <Page Remove="citiesdb\**"/>
     <None Remove="citiesdb\**"/>
     <EmbeddedResource Remove="citiesdb\**"/>
     <Content Remove="citiesdb\**"/>
   </ItemGroup>
 
+  <!-- Exclude old WPF .xaml files — replaced by .axaml equivalents -->
   <ItemGroup>
-    <!-- Allow the test project to access internal members (AcrylicHelper, AcrylicTier, etc.) -->
+    <Compile Remove="App.xaml.cs"/>
+    <None Include="App.xaml"/>
+    <AvaloniaResource Remove="App.xaml"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.3" />
+    <!-- Override vulnerable transitive dependency (CVE-2026-39959 / GHSA-xrw6-gwf8-vvr9) -->
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Allow the test project to access internal members -->
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>WorldClock.Tests</_Parameter1>
     </AssemblyAttribute>

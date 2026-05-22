@@ -1,0 +1,807 @@
+<Window x:Class="WorldClock.MainWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:helpers="clr-namespace:WorldClock.Helpers"
+        xmlns:vm="clr-namespace:WorldClock.ViewModels"
+        Title="World Clock" Width="1860" Height="796"
+        MinHeight="300" MinWidth="430"
+        Background="Transparent"
+        SystemDecorations="None"
+        TransparencyLevelHint="AcrylicBlur"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI">
+
+    <Window.Resources>
+        <helpers:SlotIndexToCanvasLeftConverter x:Key="SlotToPx"/>
+        <helpers:HexStringToBrushConverter      x:Key="HexToBrush"/>
+        <helpers:HexToThemedBrushConverter      x:Key="HexToThemedBrush"/>
+    </Window.Resources>
+
+    <ScrollViewer x:Name="ScaleScrollViewer"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Disabled"
+                  Background="{DynamicResource BrushBackgroundDark}">
+        <Viewbox x:Name="ScaleViewbox" Stretch="Uniform">
+            <Grid x:Name="DesignRoot" Width="1860" Height="796">
+
+                <Border Background="{DynamicResource BrushBackgroundDark}">
+                    <Grid x:Name="LayoutRoot">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- HEADER -->
+                        <Border Grid.Row="0"
+                                Background="{DynamicResource BrushBackgroundMid}"
+                                Padding="24,10,0,10"
+                                PointerPressed="TitleBar_PointerPressed">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="🌍" FontSize="28" VerticalAlignment="Center" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource BrushTextPrimary}"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="WORLD CLOCK" FontSize="20" FontWeight="Bold"
+                                                   Foreground="{DynamicResource BrushAccentCyan}"
+                                                   FontFamily="Consolas"/>
+                                        <TextBlock Text="Global Team Time Tracker" FontSize="11"
+                                                   Foreground="{DynamicResource BrushTextDim}"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                            VerticalAlignment="Center" HorizontalAlignment="Right">
+                                    <TextBlock x:Name="HeaderDate" FontSize="12"
+                                               Foreground="{DynamicResource BrushTextPrimary}"
+                                               FontFamily="Consolas" VerticalAlignment="Center"
+                                               Margin="0,0,12,0"/>
+                                    <Button x:Name="SettingsButton" Content="⚙" FontSize="18"
+                                            Width="40" Height="40"
+                                            Background="Transparent" BorderThickness="0"
+                                            Foreground="{DynamicResource BrushAccentCyan}"
+                                            Cursor="Hand" ToolTip.Tip="Open Settings"
+                                            Click="SettingsButton_Click"/>
+                                    <Button Content="─" Width="46" Height="36"
+                                            Background="Transparent" BorderThickness="0"
+                                            Foreground="{DynamicResource BrushTextDim}"
+                                            Cursor="Hand"
+                                            Click="MinimizeWindow_Click"/>
+                                    <Button Content="□" Width="46" Height="36"
+                                            Background="Transparent" BorderThickness="0"
+                                            Foreground="{DynamicResource BrushTextDim}"
+                                            Cursor="Hand"
+                                            Click="MaximizeWindow_Click"/>
+                                    <Button Content="✕" Width="46" Height="36"
+                                            Background="Transparent" BorderThickness="0"
+                                            Foreground="White" Cursor="Hand"
+                                            Click="CloseWindow_Click"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- UTC BANNER -->
+                        <Border Grid.Row="1" Margin="16,10,16,0" CornerRadius="12" Padding="24,16">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                    <GradientStop Color="{DynamicResource BannerGradientStart}" Offset="0"/>
+                                    <GradientStop Color="{DynamicResource BannerGradientEnd}" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="🌐" FontSize="34" HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource BrushTextPrimary}"/>
+                                    <TextBlock Text="Universal Time" FontSize="13"
+                                               Foreground="{DynamicResource BrushTextDim}"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock x:Name="UtcTime"
+                                               FontFamily="Consolas" FontSize="58" FontWeight="Bold"
+                                               TextAlignment="Center"
+                                               Foreground="{DynamicResource BrushAccentCyan}"/>
+                                    <TextBlock x:Name="UtcDate" FontSize="17" FontFamily="Consolas"
+                                               Foreground="{DynamicResource BrushTextDim}"
+                                               TextAlignment="Center" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="20,0,0,0">
+                                    <TextBlock Text="UTC+00:00" FontFamily="Consolas" FontSize="17"
+                                               Foreground="{DynamicResource BrushAccentCyan}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Coordinated Universal Time" FontSize="11"
+                                               Foreground="{DynamicResource BrushTextDim}"
+                                               HorizontalAlignment="Center"/>
+                                    <Button IsVisible="{Binding !IsUtcHome}"
+                                            Content="🏠 Set as home" FontSize="10"
+                                            Background="Transparent" BorderThickness="0"
+                                            Padding="2,3" Cursor="Hand"
+                                            HorizontalAlignment="Center"
+                                            Foreground="{DynamicResource BrushTextPrimary}"
+                                            ToolTip.Tip="Set UTC as the home timezone (anchors the time visualizer to UTC)"
+                                            Click="SetUtcHome_Click"/>
+                                    <Button IsVisible="{Binding IsUtcHome}"
+                                            Content="🏠 UTC home ✓" FontSize="10"
+                                            Background="Transparent" BorderThickness="0"
+                                            Padding="2,3" Cursor="Hand"
+                                            HorizontalAlignment="Center"
+                                            Foreground="{DynamicResource BrushAccentCyan}"
+                                            ToolTip.Tip="UTC is the home timezone — click to clear"
+                                            Click="SetUtcHome_Click"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- CITY SEARCH BAR -->
+                        <Grid Grid.Row="2" Margin="16,6,16,0"
+                              HorizontalAlignment="Center" MaxWidth="1200">
+                            <Border VerticalAlignment="Top" CornerRadius="8"
+                                    Background="{DynamicResource BrushBackgroundCard}">
+                                <Grid Margin="12,9">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="🔍" FontSize="14" VerticalAlignment="Center"
+                                               Margin="0,0,10,0"
+                                               Foreground="{DynamicResource BrushTextPrimary}"/>
+                                    <Grid Grid.Column="1">
+                                        <TextBox x:Name="GlobalCitySearchBox"
+                                                 Classes="search-transparent"
+                                                 Background="Transparent" BorderThickness="0"
+                                                 Foreground="{DynamicResource BrushTextPrimary}"
+                                                 FontSize="17"
+                                                 VerticalContentAlignment="Center"
+                                                 GotFocus="GlobalCitySearch_GotFocus"
+                                                 TextChanged="GlobalCitySearch_TextChanged"
+                                                 KeyDown="GlobalCitySearch_KeyDown"
+                                                 LostFocus="GlobalCitySearch_LostFocus"/>
+                                        <TextBlock x:Name="GlobalCitySearchPlaceholder"
+                                                   Text="City, country, code or UTC offset (e.g. +5:30)…"
+                                                   IsHitTestVisible="False" VerticalAlignment="Center"
+                                                   Opacity="0.4" FontSize="17"
+                                                   Foreground="{DynamicResource BrushTextPrimary}"/>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+
+                            <Border x:Name="GlobalSearchDropdown"
+                                    VerticalAlignment="Top" Margin="0,46,0,0"
+                                    ZIndex="100" IsVisible="False"
+                                    Background="{DynamicResource BrushBackgroundMid}"
+                                    BorderBrush="{DynamicResource BrushAccentCyan}"
+                                    BorderThickness="1" CornerRadius="0,0,8,8">
+                                <ListBox x:Name="GlobalCitySearchList"
+                                         MaxHeight="220"
+                                         Background="{DynamicResource BrushBackgroundMid}"
+                                         BorderThickness="0"
+                                         KeyDown="GlobalCitySearchList_PreviewKeyDown"
+                                         PointerReleased="GlobalCitySearchList_MouseSelect">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding SearchLabel}"
+                                                       FontFamily="Consolas" FontSize="13"
+                                                       Foreground="{DynamicResource BrushTextPrimary}"
+                                                       Padding="4,3"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                        </Grid>
+
+                        <!-- MAIN CONTENT: left clocks panel + right translator -->
+                        <Grid x:Name="ContentColumnsGrid" Grid.Row="3" Margin="16,8,16,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="0"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Clock cards panel -->
+                            <Border x:Name="ClocksPanelBorder" Grid.Column="0"
+                                    Background="{DynamicResource BrushBackgroundCard}"
+                                    CornerRadius="10">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Card panel header with mode buttons -->
+                                    <Border x:Name="ClocksPanelHeader"
+                                            Grid.Row="0"
+                                            Background="{DynamicResource BrushBackgroundMid}"
+                                            CornerRadius="10,10,0,0" Padding="16,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Text="WORLD CLOCKS"
+                                                       FontFamily="Consolas" FontSize="10" FontWeight="Bold"
+                                                       Foreground="{DynamicResource BrushAccentCyan}"
+                                                       VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                                <Border x:Name="EditModeBtnBorder" CornerRadius="4">
+                                                    <TextBlock Text="✏" FontSize="16" Cursor="Hand"
+                                                               Foreground="{DynamicResource BrushAccentCyan}"
+                                                               ToolTip.Tip="Toggle Edit Mode"
+                                                               PointerPressed="ToggleEditMode_Click"/>
+                                                </Border>
+                                                <Border x:Name="DeleteModeBtnBorder" CornerRadius="4">
+                                                    <TextBlock Text="🗑" FontSize="16" Cursor="Hand"
+                                                               Foreground="{DynamicResource BrushTextDim}"
+                                                               ToolTip.Tip="Toggle Delete Mode"
+                                                               PointerPressed="ToggleDeleteMode_Click"/>
+                                                </Border>
+                                                <TextBlock Text="⇔" FontSize="16" Cursor="Hand"
+                                                           Foreground="{DynamicResource BrushTextDim}"
+                                                           ToolTip.Tip="Toggle Time Translator"
+                                                           PointerPressed="ToggleTranslator_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Card list -->
+                                    <ScrollViewer Grid.Row="1">
+                                        <ItemsControl x:Name="LocationsPanel">
+                                            <ItemsControl.ItemContainerTheme>
+                                                <ControlTheme TargetType="ContentPresenter">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                </ControlTheme>
+                                            </ItemsControl.ItemContainerTheme>
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Vertical"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Margin="8,4"
+                                                            CornerRadius="8"
+                                                            HorizontalAlignment="Stretch"
+                                                            Background="{DynamicResource BrushBackgroundMid}"
+                                                            BorderThickness="1"
+                                                            BorderBrush="Transparent"
+                                                            DragDrop.AllowDrop="True"
+                                                            DragDrop.DragOver="Card_DragOver"
+                                                            DragDrop.Drop="Card_Drop">
+                                                        <Grid Margin="12,8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                                                        VerticalAlignment="Center"
+                                                                        Margin="0,0,10,0"
+                                                                        Cursor="SizeAll"
+                                                                        IsVisible="{Binding !IsEditing}"
+                                                                        PointerPressed="DragHandle_PointerPressed">
+                                                                <TextBlock Text="⠿"
+                                                                           FontSize="18" VerticalAlignment="Center"
+                                                                           Foreground="{DynamicResource BrushTextDim}"
+                                                                           Margin="0,0,4,0"/>
+                                                                <TextBlock Text="{Binding CountryFlag}"
+                                                                           FontSize="22" VerticalAlignment="Center"
+                                                                           FontFamily="{StaticResource EmojiFontFamily}"/>
+                                                            </StackPanel>
+
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" IsVisible="{Binding !IsEditing}">
+                                                                <TextBlock Text="{Binding CurrentTime}"
+                                                                           FontFamily="Consolas" FontSize="28"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="{Binding ThemedAccentBrush}"/>
+                                                                <TextBlock Text="{Binding CityName}"
+                                                                           FontSize="13" FontWeight="SemiBold"
+                                                                           Foreground="{DynamicResource BrushTextPrimary}"/>
+                                                                <TextBlock Text="{Binding TeamLabel}"
+                                                                           FontSize="10"
+                                                                           Foreground="{DynamicResource BrushTextDim}"/>
+                                                            </StackPanel>
+
+                                                            <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="4" IsVisible="{Binding !IsEditing}">
+                                                                <TextBlock Text="{Binding UtcOffset}"
+                                                                           FontFamily="Consolas" FontSize="11"
+                                                                           Foreground="{DynamicResource BrushTextDim}"
+                                                                           HorizontalAlignment="Right"/>
+                                                                <Button Content="🏠" FontSize="12"
+                                                                        Background="Transparent" BorderThickness="0"
+                                                                        Padding="4" Cursor="Hand"
+                                                                        Tag="{Binding}"
+                                                                        IsVisible="{Binding IsEditVisible}"
+                                                                        Click="SetHomeLocation_Click"/>
+                                                                <Button Content="✏" FontSize="12"
+                                                                        Background="Transparent" BorderThickness="0"
+                                                                        Padding="4" Cursor="Hand"
+                                                                        Tag="{Binding}"
+                                                                        Click="EditCard_Click"
+                                                                        IsVisible="{Binding IsEditVisible}"/>
+                                                                <Button Content="🗑" FontSize="12"
+                                                                        Background="Transparent" BorderThickness="0"
+                                                                        Padding="4" Cursor="Hand"
+                                                                        Tag="{Binding}"
+                                                                        Click="DeleteCard_Click"
+                                                                        IsVisible="{Binding IsDeleteVisible}"/>
+                                                            </StackPanel>
+
+                                                            <!-- ── Edit view: colour palette + text fields ── -->
+                                                            <Grid Grid.Column="0" Grid.ColumnSpan="3"
+                                                                  IsVisible="{Binding IsEditing}">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <StackPanel Grid.Column="0" Spacing="4">
+                                                                    <!-- City name + flag emoji -->
+                                                                    <Grid>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                            <ColumnDefinition Width="48"/>
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBox Text="{Binding EditingCityName}"
+                                                                                 Classes="input-dark"
+                                                                                 FontSize="13"
+                                                                                 Background="{DynamicResource BrushBackgroundDark}"
+                                                                                 Foreground="{DynamicResource BrushTextPrimary}"
+                                                                                 BorderBrush="{DynamicResource BrushSeparator}"
+                                                                                 Watermark="City name"
+                                                                                 Margin="0,0,4,0"/>
+                                                                        <TextBox Grid.Column="1"
+                                                                                 Classes="input-dark"
+                                                                                 Text="{Binding EditingCountryFlag}"
+                                                                                 FontSize="16"
+                                                                                 FontFamily="{StaticResource EmojiFontFamily}"
+                                                                                 TextAlignment="Center"
+                                                                                 Background="{DynamicResource BrushBackgroundDark}"
+                                                                                 Foreground="{DynamicResource BrushTextPrimary}"
+                                                                                 BorderBrush="{DynamicResource BrushSeparator}"/>
+                                                                    </Grid>
+                                                                    <!-- Team label -->
+                                                                    <TextBox Text="{Binding EditingTeamLabel}"
+                                                                             Classes="input-dark"
+                                                                             FontSize="11"
+                                                                             Background="{DynamicResource BrushBackgroundDark}"
+                                                                             Foreground="{DynamicResource BrushTextPrimary}"
+                                                                             BorderBrush="{DynamicResource BrushSeparator}"
+                                                                             Watermark="Team label (optional)"/>
+                                                                    <!-- Colour palette -->
+                                                                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                                        <TextBlock Text="Color:" FontSize="10"
+                                                                                   Foreground="{DynamicResource BrushTextDim}"
+                                                                                   VerticalAlignment="Center"/>
+                                                                        <Border Width="16" Height="16"
+                                                                                Background="{Binding ThemedAccentBrush}"
+                                                                                CornerRadius="2" BorderThickness="1"
+                                                                                BorderBrush="#44FFFFFF"
+                                                                                VerticalAlignment="Center"
+                                                                                Margin="0,0,4,0"/>
+                                                                        <WrapPanel>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#00E5FF}" Tag="#00E5FF" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#FFD600}" Tag="#FFD600" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#00E676}" Tag="#00E676" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#FF9100}" Tag="#FF9100" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#CE93D8}" Tag="#CE93D8" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#FF4081}" Tag="#FF4081" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#69F0AE}" Tag="#69F0AE" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#F48FB1}" Tag="#F48FB1" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#80DEEA}" Tag="#80DEEA" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#FFCC02}" Tag="#FFCC02" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#B39DDB}" Tag="#B39DDB" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                            <Button Width="20" Height="20" Background="{Binding ThemedAccentBrush, Converter={StaticResource HexToThemedBrush}, ConverterParameter=#4DD0E1}" Tag="#4DD0E1" Click="PaletteColor_Click" CornerRadius="3" Padding="0" BorderThickness="0" Cursor="Hand" Margin="1"/>
+                                                                        </WrapPanel>
+                                                                    </StackPanel>
+                                                                </StackPanel>
+
+                                                                <!-- Save / Cancel -->
+                                                                <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                                                            Spacing="4" Margin="8,0,0,0">
+                                                                    <Button Content="✓"
+                                                                            Background="Transparent" BorderThickness="0"
+                                                                            FontSize="16" Foreground="#00E676"
+                                                                            Tag="{Binding}" Click="SaveCard_Click"
+                                                                            Cursor="Hand" Padding="4"/>
+                                                                    <Button Content="✗"
+                                                                            Background="Transparent" BorderThickness="0"
+                                                                            FontSize="16" Foreground="#FF4081"
+                                                                            Tag="{Binding}" Click="CancelCard_Click"
+                                                                            Cursor="Hand" Padding="4"/>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+
+                            <!-- Time Translator panel -->
+                            <Border x:Name="VisualizerPanelBorder" Grid.Column="1"
+                                    IsVisible="False"
+                                    Background="{DynamicResource BrushBackgroundCard}"
+                                    CornerRadius="0,10,10,0">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Visualizer header: title + date navigation -->
+                                    <Border Grid.Row="0"
+                                            Background="{DynamicResource BrushBackgroundMid}"
+                                            CornerRadius="0,10,0,0" Padding="12,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="TIME TRANSLATOR"
+                                                       FontFamily="Consolas" FontSize="10" FontWeight="Bold"
+                                                       Foreground="{DynamicResource BrushAccentCyan}"
+                                                       VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                                <Button Content="◀" Click="TranslatorPrevDay_Click"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Foreground="{DynamicResource BrushTextPrimary}" Cursor="Hand"/>
+                                                <TextBlock Text="{Binding Translator.DateLabel}"
+                                                           FontFamily="Consolas" FontSize="11"
+                                                           Foreground="{DynamicResource BrushTextPrimary}"
+                                                           VerticalAlignment="Center"/>
+                                                <Button Content="TODAY" Click="TranslatorToday_Click"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Foreground="{DynamicResource BrushAccentCyan}" FontSize="10" Cursor="Hand"/>
+                                                <Button Content="▶" Click="TranslatorNextDay_Click"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Foreground="{DynamicResource BrushTextPrimary}" Cursor="Hand"/>
+                                                <Button Content="📅 Teams" Click="CreateTeamsMeeting_Click"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Foreground="{DynamicResource BrushTextDim}" FontSize="10" Cursor="Hand"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Timeline grid: column header + scrollable data rows -->
+                                    <Border Grid.Row="1" Margin="8,4,8,4"
+                                            Background="{DynamicResource BrushBackgroundDark}"
+                                            CornerRadius="8" ClipToBounds="True"
+                                            PointerPressed="GridArea_PreviewMouseDown"
+                                            PointerMoved="GridArea_PreviewMouseMove"
+                                            PointerReleased="GridArea_PreviewMouseUp">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="36"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+
+                                            <!-- Column header row (36px) -->
+                                            <Border Grid.Row="0"
+                                                    Background="{DynamicResource BrushBackgroundMid}"
+                                                    BorderBrush="{DynamicResource BrushSeparator}"
+                                                    BorderThickness="0,0,0,1">
+                                                <Grid>
+                                                    <!-- Layer 1: per-slot selection highlight -->
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Width="345" Background="{DynamicResource BrushBackgroundMid}"/>
+                                                        <ItemsControl ItemsSource="{Binding Translator.Columns}">
+                                                            <ItemsControl.ItemContainerTheme>
+                                                                <ControlTheme TargetType="ContentPresenter">
+                                                                    <Setter Property="Canvas.Left" Value="{Binding SlotIndex, Converter={StaticResource SlotToPx}}"/>
+                                                                    <Setter Property="Canvas.Top" Value="0"/>
+                                                                </ControlTheme>
+                                                            </ItemsControl.ItemContainerTheme>
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <Canvas Width="1152" Height="36"/>
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border Width="24" Height="36">
+                                                                        <Border Background="#2000E5FF"
+                                                                                IsVisible="{Binding IsSelected}"/>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+
+                                                    <!-- Layer 2: hour labels (IsHitTestVisible=False) -->
+                                                    <ItemsControl ItemsSource="{Binding Translator.Columns}"
+                                                                  Margin="345,0,0,0"
+                                                                  IsHitTestVisible="False">
+                                                        <ItemsControl.ItemContainerTheme>
+                                                            <ControlTheme TargetType="ContentPresenter">
+                                                                <Setter Property="Canvas.Left" Value="{Binding SlotIndex, Converter={StaticResource SlotToPx}}"/>
+                                                                <Setter Property="Canvas.Top" Value="0"/>
+                                                            </ControlTheme>
+                                                        </ItemsControl.ItemContainerTheme>
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <Canvas Width="1152" Height="36" HorizontalAlignment="Left"/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <!-- 48px wide spans both :00 and :30 slots; only shown for IsHourStart -->
+                                                                <Border Width="48" Height="36" Background="Transparent"
+                                                                        IsVisible="{Binding IsHourStart}">
+                                                                    <Grid VerticalAlignment="Center">
+                                                                        <!-- Midnight: weekday + date -->
+                                                                        <StackPanel IsVisible="{Binding IsMidnight}">
+                                                                            <TextBlock Text="{Binding DayOfWeekLabel}"
+                                                                                       FontFamily="Consolas" FontSize="10" FontWeight="Bold"
+                                                                                       Foreground="{DynamicResource BrushAccentCyan}"
+                                                                                       HorizontalAlignment="Center"
+                                                                                       LineHeight="13"/>
+                                                                            <TextBlock Text="{Binding DateShortLabel}"
+                                                                                       FontFamily="Consolas" FontSize="12"
+                                                                                       Foreground="{DynamicResource BrushTextDim}"
+                                                                                       HorizontalAlignment="Center"
+                                                                                       LineHeight="12"/>
+                                                                        </StackPanel>
+                                                                        <!-- Non-midnight hour: hour + am/pm -->
+                                                                        <StackPanel IsVisible="{Binding IsNonMidnightHourStart}">
+                                                                            <TextBlock Text="{Binding SlotHour}"
+                                                                                       FontFamily="Consolas" FontSize="12"
+                                                                                       Foreground="{DynamicResource BrushTextDim}"
+                                                                                       HorizontalAlignment="Center"
+                                                                                       LineHeight="15"/>
+                                                                            <TextBlock Text="{Binding SlotAmPm}"
+                                                                                       FontFamily="Consolas" FontSize="12"
+                                                                                       Foreground="{DynamicResource BrushTextDim}"
+                                                                                       HorizontalAlignment="Center"
+                                                                                       LineHeight="12"/>
+                                                                        </StackPanel>
+                                                                    </Grid>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+
+                                                </Grid>
+                                            </Border>
+
+                                            <!-- Scrollable city rows -->
+                                            <ScrollViewer x:Name="GridScrollViewer" Grid.Row="1"
+                                                          VerticalScrollBarVisibility="Auto"
+                                                          HorizontalScrollBarVisibility="Disabled">
+                                                <ItemsControl ItemsSource="{Binding Translator.Rows}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Orientation="Vertical"/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Height="44">
+                                                                <StackPanel Orientation="Horizontal">
+
+                                                                    <!-- Row header card (345px) -->
+                                                                    <Border Width="345" Height="44"
+                                                                            Background="{DynamicResource BrushBackgroundMid}"
+                                                                            BorderBrush="{DynamicResource BrushSeparator}"
+                                                                            BorderThickness="0,0,1,1"
+                                                                            ClipToBounds="True">
+                                                                        <Grid>
+                                                                            <!-- Left accent bar -->
+                                                                            <Border HorizontalAlignment="Left"
+                                                                                    VerticalAlignment="Stretch"
+                                                                                    Width="3"
+                                                                                    Background="{Binding ThemedAccentBrush}"/>
+                                                                            <!-- 3-section info grid -->
+                                                                            <Grid Margin="3,2,2,2" VerticalAlignment="Center">
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="100"/>
+                                                                                    <ColumnDefinition Width="135"/>
+                                                                                    <ColumnDefinition Width="100"/>
+                                                                                </Grid.ColumnDefinitions>
+                                                                                <!-- Col 0: flag + city + UTC offset -->
+                                                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                                                    <StackPanel Orientation="Horizontal">
+                                                                                        <TextBlock Text="{Binding CountryFlag}"
+                                                                                                   FontSize="16" VerticalAlignment="Center"
+                                                                                                   Foreground="{DynamicResource BrushTextPrimary}"
+                                                                                                   FontFamily="{StaticResource EmojiFontFamily}"
+                                                                                                   Margin="0,0,2,0"/>
+                                                                                        <TextBlock Text="{Binding CityName}"
+                                                                                                   FontSize="13" FontWeight="Bold"
+                                                                                                   Foreground="{DynamicResource BrushTextPrimary}"
+                                                                                                   TextTrimming="CharacterEllipsis"
+                                                                                                   MaxWidth="76" VerticalAlignment="Center"/>
+                                                                                    </StackPanel>
+                                                                                    <TextBlock Text="{Binding UtcOffset}"
+                                                                                               FontFamily="Consolas" FontSize="12"
+                                                                                               Foreground="{Binding ThemedAccentBrush}"/>
+                                                                                </StackPanel>
+                                                                                <!-- Col 1: selected time range (visible after user selects) -->
+                                                                                <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                                                                            Margin="4,0,4,0"
+                                                                                            IsVisible="{Binding ShowTranslatedTime}">
+                                                                                    <StackPanel Orientation="Horizontal">
+                                                                                        <TextBlock Text="{Binding SelectedTimeStr}"
+                                                                                                   FontFamily="Consolas" FontSize="15" FontWeight="Bold"
+                                                                                                   Foreground="{Binding ThemedAccentBrush}"/>
+                                                                                        <StackPanel Orientation="Horizontal"
+                                                                                                    IsVisible="{Binding HasRange}">
+                                                                                            <TextBlock Text="→" FontFamily="Consolas" FontSize="12"
+                                                                                                       Foreground="{DynamicResource BrushTextDim}"
+                                                                                                       VerticalAlignment="Center" Margin="2,0"/>
+                                                                                            <TextBlock Text="{Binding SelectedEndTimeStr}"
+                                                                                                       FontFamily="Consolas" FontSize="15" FontWeight="Bold"
+                                                                                                       Foreground="{Binding ThemedAccentBrush}"/>
+                                                                                        </StackPanel>
+                                                                                    </StackPanel>
+                                                                                    <TextBlock Text="{Binding DateLabel}"
+                                                                                               FontFamily="Consolas" FontSize="11"
+                                                                                               Foreground="{DynamicResource BrushTextDim}"/>
+                                                                                </StackPanel>
+                                                                                <!-- Col 2: date + DST badge (visible after user selects) -->
+                                                                                <StackPanel Grid.Column="2" VerticalAlignment="Center"
+                                                                                            IsVisible="{Binding ShowTranslatedTime}">
+                                                                                    <TextBlock Text="{Binding DateLabel}"
+                                                                                               FontFamily="Consolas" FontSize="12" FontWeight="Bold"
+                                                                                               Foreground="{DynamicResource BrushTextPrimary}"/>
+                                                                                    <Border CornerRadius="2" Padding="2,0"
+                                                                                            Background="{DynamicResource BrushBackgroundDark}">
+                                                                                        <StackPanel Orientation="Horizontal" Spacing="2">
+                                                                                            <TextBlock Text="{Binding DstLabel}"
+                                                                                                       FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                                                                                                       Foreground="{DynamicResource BrushDstActive}"
+                                                                                                       IsVisible="{Binding IsDst}"/>
+                                                                                            <TextBlock Text="{Binding DstLabel}"
+                                                                                                       FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                                                                                                       Foreground="{DynamicResource BrushTextDim}"
+                                                                                                       IsVisible="{Binding !IsDst}"/>
+                                                                                        </StackPanel>
+                                                                                    </Border>
+                                                                                </StackPanel>
+                                                                            </Grid>
+                                                                        </Grid>
+                                                                    </Border>
+
+                                                                    <!-- Timeline cell area (1152px = 48 slots × 24px) -->
+                                                                    <Grid Width="1152" Height="44">
+
+                                                                        <!-- Layer 1a: band background colors + day-change bar -->
+                                                                        <ItemsControl ItemsSource="{Binding Cells}">
+                                                                            <ItemsControl.ItemContainerTheme>
+                                                                                <ControlTheme TargetType="ContentPresenter">
+                                                                                    <Setter Property="Canvas.Left" Value="{Binding SlotIndex, Converter={StaticResource SlotToPx}}"/>
+                                                                                    <Setter Property="Canvas.Top" Value="0"/>
+                                                                                </ControlTheme>
+                                                                            </ItemsControl.ItemContainerTheme>
+                                                                            <ItemsControl.ItemsPanel>
+                                                                                <ItemsPanelTemplate>
+                                                                                    <Canvas Width="1152" Height="44"/>
+                                                                                </ItemsPanelTemplate>
+                                                                            </ItemsControl.ItemsPanel>
+                                                                            <ItemsControl.ItemTemplate>
+                                                                                <DataTemplate>
+                                                                                    <Border Width="24" Height="44"
+                                                                                            Background="{Binding Background}"
+                                                                                            BorderBrush="{DynamicResource BrushSeparator}"
+                                                                                            BorderThickness="0,0,0,1">
+                                                                                        <!-- Day-change indicator bar at top -->
+                                                                                        <Border VerticalAlignment="Top" Height="2"
+                                                                                                Background="#80FF8C00"
+                                                                                                IsVisible="{Binding IsNextDay}"/>
+                                                                                    </Border>
+                                                                                </DataTemplate>
+                                                                            </ItemsControl.ItemTemplate>
+                                                                        </ItemsControl>
+
+                                                                        <!-- Layer 1b: per-slot selection overlay -->
+                                                                        <ItemsControl ItemsSource="{Binding Cells}"
+                                                                                      IsHitTestVisible="False">
+                                                                            <ItemsControl.ItemContainerTheme>
+                                                                                <ControlTheme TargetType="ContentPresenter">
+                                                                                    <Setter Property="Canvas.Left" Value="{Binding SlotIndex, Converter={StaticResource SlotToPx}}"/>
+                                                                                    <Setter Property="Canvas.Top" Value="0"/>
+                                                                                </ControlTheme>
+                                                                            </ItemsControl.ItemContainerTheme>
+                                                                            <ItemsControl.ItemsPanel>
+                                                                                <ItemsPanelTemplate>
+                                                                                    <Canvas Width="1152" Height="44"/>
+                                                                                </ItemsPanelTemplate>
+                                                                            </ItemsControl.ItemsPanel>
+                                                                            <ItemsControl.ItemTemplate>
+                                                                                <DataTemplate>
+                                                                                    <Border Width="24" Height="44">
+                                                                                        <Border Background="#6000E5FF"
+                                                                                                IsVisible="{Binding IsSelected}"/>
+                                                                                    </Border>
+                                                                                </DataTemplate>
+                                                                            </ItemsControl.ItemTemplate>
+                                                                        </ItemsControl>
+
+                                                                        <!-- Layer 2: time labels (hour slots only, IsHitTestVisible=False) -->
+                                                                        <ItemsControl ItemsSource="{Binding Cells}"
+                                                                                      IsHitTestVisible="False">
+                                                                            <ItemsControl.ItemContainerTheme>
+                                                                                <ControlTheme TargetType="ContentPresenter">
+                                                                                    <Setter Property="Canvas.Left" Value="{Binding SlotIndex, Converter={StaticResource SlotToPx}}"/>
+                                                                                    <Setter Property="Canvas.Top" Value="0"/>
+                                                                                </ControlTheme>
+                                                                            </ItemsControl.ItemContainerTheme>
+                                                                            <ItemsControl.ItemsPanel>
+                                                                                <ItemsPanelTemplate>
+                                                                                    <Canvas Width="1152" Height="44" HorizontalAlignment="Left"/>
+                                                                                </ItemsPanelTemplate>
+                                                                            </ItemsControl.ItemsPanel>
+                                                                            <ItemsControl.ItemTemplate>
+                                                                                <DataTemplate>
+                                                                                    <!-- 48px wide spans :00+:30 pair; shown only for IsHourSlot -->
+                                                                                    <Border Width="48" Height="44" Background="Transparent"
+                                                                                            IsVisible="{Binding IsHourSlot}">
+                                                                                        <StackPanel VerticalAlignment="Center" Margin="-5,0,-5,0">
+                                                                                            <TextBlock Text="{Binding TimeHourPart}"
+                                                                                                       FontFamily="Consolas" FontSize="14"
+                                                                                                       Foreground="{Binding Foreground}"
+                                                                                                       HorizontalAlignment="Center"
+                                                                                                       LineHeight="15"/>
+                                                                                            <TextBlock Text="{Binding TimeAmPmPart}"
+                                                                                                       FontFamily="Consolas" FontSize="10"
+                                                                                                       Foreground="{Binding Foreground}"
+                                                                                                       HorizontalAlignment="Center"
+                                                                                                       LineHeight="11"/>
+                                                                                        </StackPanel>
+                                                                                    </Border>
+                                                                                </DataTemplate>
+                                                                            </ItemsControl.ItemTemplate>
+                                                                        </ItemsControl>
+
+                                                                    </Grid>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+
+                                            <!-- Spanning cyan needle: overlays column header and all data rows -->
+                                            <Canvas Grid.Row="0" Grid.RowSpan="2"
+                                                    IsHitTestVisible="False" HorizontalAlignment="Left">
+                                                <Rectangle Canvas.Left="{Binding Translator.CurrentTimeLeft}"
+                                                           Canvas.Top="0" Width="2" Height="9999"
+                                                           Fill="#CC00E5FF"
+                                                           IsVisible="{Binding Translator.ShowCurrentTime}"/>
+                                            </Canvas>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- FOOTER -->
+                        <Border Grid.Row="4" Margin="16,6,16,10"
+                                Background="{DynamicResource BrushBackgroundCard}"
+                                CornerRadius="8" Padding="16,8">
+                            <TextBlock Text="World Clock — Global Team Time Tracker"
+                                       FontSize="10" FontFamily="Consolas"
+                                       Foreground="{DynamicResource BrushTextDim}"
+                                       HorizontalAlignment="Center"/>
+                        </Border>
+
+                    </Grid>
+                </Border>
+
+            </Grid>
+        </Viewbox>
+    </ScrollViewer>
+</Window>

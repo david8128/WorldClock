@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows.Media;
+using Avalonia.Media;
 using WorldClock.Helpers;
 
 namespace WorldClock.Models;

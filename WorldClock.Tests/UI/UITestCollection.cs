@@ -3,8 +3,8 @@ using Xunit;
 namespace WorldClock.Tests.UI;
 
 /// <summary>
-/// Marks all UI automation tests as sequential (no parallelism).
-/// FlaUI launches a real process and must not run concurrently.
+/// Marks all UI tests as sequential.
+/// Avalonia.Headless windows must not share an AppBuilder across parallel threads.
 /// </summary>
 [CollectionDefinition("UI Tests", DisableParallelization = true)]
 public class UITestCollection { }

@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWPF>true</UseWPF>
+    <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -15,9 +14,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitives</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Xunit.StaFact"                  Version="1.1.11" />
-    <PackageReference Include="FlaUI.Core"                     Version="4.0.0" />
-    <PackageReference Include="FlaUI.UIA3"                     Version="4.0.0" />
+    <PackageReference Include="Avalonia"                       Version="11.2.3" />
+    <PackageReference Include="Avalonia.Headless.XUnit"        Version="11.2.3" />
     <PackageReference Include="FluentAssertions"               Version="6.12.0" />
   </ItemGroup>
 
