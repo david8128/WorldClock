@@ -32,13 +32,38 @@
 .EXAMPLE
     # Custom ISCC path
     .\scripts\Build-WindowsInstaller.ps1 -IsccPath "D:\Tools\InnoSetup6\ISCC.exe"
+
+.PARAMETER Upload
+    Upload the finished installer to a GitHub Release as a versioned asset.
+    Requires the GITHUB_TOKEN environment variable to be set.
+
+.PARAMETER GitHubRepo
+    GitHub repository as OWNER/REPO (e.g. myorg/worldclock).
+    Can also be provided via the GITHUB_REPO environment variable.
+
+.PARAMETER GitHubTag
+    Release tag to upload to (e.g. v1.2.3).
+    Defaults to v<Version> when omitted.
+
+.EXAMPLE
+    # Build and upload to GitHub Releases
+    $env:GITHUB_TOKEN = 'ghp_...'
+    .\scripts\Build-WindowsInstaller.ps1 -Upload -GitHubRepo myorg/worldclock
+
+.EXAMPLE
+    # Re-upload only (skip publish + ISCC), targeting an explicit tag
+    $env:GITHUB_TOKEN = 'ghp_...'
+    .\scripts\Build-WindowsInstaller.ps1 -SkipPublish -Upload -GitHubRepo myorg/worldclock -GitHubTag v1.1.0
 #>
 [CmdletBinding()]
 param(
     [string] $Configuration = 'Release',
     [string] $Version       = '',       # empty = read from VERSION file
     [string] $IsccPath      = '',
-    [switch] $SkipPublish
+    [switch] $SkipPublish,
+    [switch] $Upload,                   # push installer to a GitHub Release
+    [string] $GitHubRepo    = '',       # OWNER/REPO  (or $env:GITHUB_REPO)
+    [string] $GitHubTag     = ''        # defaults to v$Version
 )
 
 Set-StrictMode -Version Latest
@@ -146,4 +171,87 @@ if (Test-Path $InstallerFile) {
     Write-Host ("[OK] Installer ready: $InstallerFile  ({0:N1} MB)" -f $size) -ForegroundColor Green
 } else {
     Write-Host '[OK] Inno Setup finished. Check installer\Output\ for the .exe.' -ForegroundColor Green
+}
+
+# ── Step 3: Upload to GitHub Releases ─────────────────────────────────────────────
+if ($Upload) {
+    Write-Step 'Uploading installer to GitHub Releases ...'
+
+    # ── Validate prerequisites ───────────────────────────────────────────────
+    $Token = $env:GITHUB_TOKEN
+    if ([string]::IsNullOrWhiteSpace($Token)) {
+        Write-Error "GITHUB_TOKEN environment variable is not set.`n  Set it with: `$env:GITHUB_TOKEN = 'ghp_...'"
+    }
+    if ([string]::IsNullOrWhiteSpace($GitHubRepo)) {
+        $GitHubRepo = $env:GITHUB_REPO
+        if ([string]::IsNullOrWhiteSpace($GitHubRepo)) {
+            Write-Error 'Specify -GitHubRepo OWNER/REPO or set the GITHUB_REPO environment variable.'
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($GitHubTag)) { $GitHubTag = "v$Version" }
+
+    $InstallerPath = Join-Path $OutputDir 'WorldClockSetup.exe'
+    if (-not (Test-Path $InstallerPath)) {
+        Write-Error "Installer not found at $InstallerPath — ensure the build succeeded before uploading."
+    }
+
+    $ApiBase   = "https://api.github.com/repos/$GitHubRepo"
+    $AssetName = "WorldClockSetup-$Version.exe"
+    $Headers   = @{
+        Authorization          = "Bearer $Token"
+        Accept                 = 'application/vnd.github+json'
+        'X-GitHub-Api-Version' = '2022-11-28'
+    }
+
+    Write-Host "    Tag:  $GitHubTag" -ForegroundColor Gray
+    Write-Host "    Repo: $GitHubRepo" -ForegroundColor Gray
+    Write-Host "    File: $InstallerPath" -ForegroundColor Gray
+
+    # ── Look up (or create) the release ───────────────────────────────────
+    Write-Host "    Looking up release '$GitHubTag' ..." -ForegroundColor Gray
+    $Release = $null
+    try {
+        $Release = Invoke-RestMethod -Uri "$ApiBase/releases/tags/$GitHubTag" `
+                       -Headers $Headers -Method Get -ErrorAction Stop
+    } catch {
+        # 404 = release does not exist yet; any other error is fatal
+        if ($_.Exception.Message -notmatch '404|Not Found') { throw }
+    }
+
+    if ($null -eq $Release) {
+        Write-Host "    Release '$GitHubTag' not found — creating it ..." -ForegroundColor Gray
+        $Body    = [ordered]@{
+            tag_name   = $GitHubTag
+            name       = "WorldClock $Version"
+            body       = "WorldClock $Version"
+            draft      = $false
+            prerelease = $false
+        } | ConvertTo-Json
+        $Release = Invoke-RestMethod -Uri "$ApiBase/releases" `
+                       -Headers $Headers -Method Post `
+                       -ContentType 'application/json' -Body $Body
+    }
+
+    Write-Host "    Release ID: $($Release.id)" -ForegroundColor Gray
+
+    # ── Delete existing asset with the same name (makes re-runs idempotent) ───
+    $Existing = $Release.assets | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1
+    if ($Existing) {
+        Write-Host "    Removing existing asset '$AssetName' (id=$($Existing.id)) ..." -ForegroundColor Gray
+        Invoke-RestMethod -Uri "$ApiBase/releases/assets/$($Existing.id)" `
+            -Headers $Headers -Method Delete | Out-Null
+    }
+
+    # ── Upload the installer ─────────────────────────────────────────────────
+    $UploadUri  = "https://uploads.github.com/repos/$GitHubRepo/releases/$($Release.id)/assets"
+    $FileSizeMB = (Get-Item $InstallerPath).Length / 1MB
+    Write-Host ("    Uploading $AssetName ({0:N1} MB) ..." -f $FileSizeMB) -ForegroundColor Gray
+
+    $Asset = Invoke-RestMethod -Uri "${UploadUri}?name=$AssetName&label=$AssetName" `
+                 -Headers $Headers -Method Post `
+                 -ContentType 'application/octet-stream' `
+                 -InFile $InstallerPath
+
+    Write-Host ''
+    Write-Host "[OK] Asset published: $($Asset.browser_download_url)" -ForegroundColor Green
 }

@@ -3,8 +3,7 @@
 # build-linux-deb.sh — Packages WorldClock as a Debian/Ubuntu .deb
 #
 # The resulting package installs a /usr/bin/worldclock launcher that:
-#   • On WSL2  – runs the Windows .exe directly via WSLg / binfmt interop.
-#   • On Linux – runs the Windows .exe via Wine.
+#   • Requires WSL2 with WSLg — runs the Windows .exe directly via binfmt interop.
 #
 # Prerequisites:
 #   • .NET SDK 8 (https://dot.net)
@@ -13,6 +12,10 @@
 #
 # Usage:
 #   bash scripts/build-linux-deb.sh [--version 1.2.3] [--skip-publish]
+#   bash scripts/build-linux-deb.sh [--version 1.2.3] --upload --repo owner/repo
+#
+#   GITHUB_TOKEN must be set as an environment variable before running --upload.
+#   Never pass a token as a command-line argument.
 # =============================================================================
 
 set -euo pipefail
@@ -21,14 +24,26 @@ set -euo pipefail
 VERSION="1.0.0"
 SKIP_PUBLISH=false
 ARCH="amd64"
+UPLOAD=false
+GITHUB_REPO="${GITHUB_REPO:-}"   # owner/repo  (can also be set via env)
+GITHUB_TAG=""                     # defaults to v$VERSION
 
 # ── Parse arguments ───────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --version)      VERSION="${2//$'\r'/}"; shift 2 ;;
         --skip-publish) SKIP_PUBLISH=true; shift ;;
+        --upload)       UPLOAD=true; shift ;;
+        --repo)         GITHUB_REPO="${2}"; shift 2 ;;
+        --tag)          GITHUB_TAG="${2}"; shift 2 ;;
         --help)
             echo "Usage: build-linux-deb.sh [--version X.Y.Z] [--skip-publish]"
+            echo "                          [--upload [--repo OWNER/REPO] [--tag vX.Y.Z]]"
+            echo ""
+            echo "Upload flags (requires GITHUB_TOKEN env var):"
+            echo "  --upload      Push the .deb to a GitHub Release as a release asset"
+            echo "  --repo        GitHub repo as OWNER/REPO (or set \$GITHUB_REPO env var)"
+            echo "  --tag         Release tag to target (defaults to v\$VERSION)"
             exit 0
             ;;
         *) echo "Unknown option: $1"; exit 1 ;;
@@ -96,14 +111,11 @@ Package: worldclock
 Version: ${VERSION}
 Architecture: ${ARCH}
 Maintainer: WorldClock Team <worldclock@example.com>
-Depends: wine (>= 6.0) | wine64 (>= 6.0)
-Recommends: winetricks
 Description: WorldClock — multi-timezone clock and time visualizer
  A desktop clock app showing multiple timezones with a time visualizer,
  city search, and Microsoft Teams meeting integration.
  .
- On WSL2 the Windows executable runs directly via WSLg.
- On bare Linux it runs via Wine.
+ Requires WSL2 with WSLg — the Windows executable runs directly via binfmt interop.
 Homepage: https://github.com/worldclock
 Section: utils
 Priority: optional
@@ -112,9 +124,7 @@ EOF
 # ── Step 4: /usr/bin/worldclock launcher ──────────────────────────────────────
 cat > "$BIN_DIR/worldclock" <<'LAUNCHER'
 #!/usr/bin/env bash
-# WorldClock launcher
-# - WSL2 with WSLg: runs the Windows .exe via binfmt interop (display via WSLg)
-# - Bare Linux:     runs the Windows .exe via Wine
+# WorldClock launcher — requires WSL2 with WSLg
 
 set -euo pipefail
 
@@ -126,30 +136,15 @@ if [ ! -f "$EXE" ]; then
     exit 1
 fi
 
-# ── WSL2 detection ────────────────────────────────────────────────────────────
-if grep -qi microsoft /proc/version 2>/dev/null; then
-    # WSLg provides an X/Wayland display automatically.
-    exec "$EXE" "$@"
-fi
-
-# ── Bare Linux via Wine ───────────────────────────────────────────────────────
-WINE_BIN=""
-for candidate in wine64 wine; do
-    if command -v "$candidate" &>/dev/null; then
-        WINE_BIN="$candidate"
-        break
-    fi
-done
-
-if [ -z "$WINE_BIN" ]; then
-    echo "WorldClock requires Wine on non-WSL Linux." >&2
-    echo "Install with:  sudo apt-get install wine" >&2
+# ── WSL2 check ───────────────────────────────────────────────────────────────
+if ! grep -qi microsoft /proc/version 2>/dev/null; then
+    echo "ERROR: WorldClock requires WSL2 with WSLg." >&2
+    echo "  See: https://learn.microsoft.com/windows/wsl/tutorials/gui-apps" >&2
     exit 1
 fi
 
-# Silence Wine debug noise unless WINEDEBUG is already set
-export WINEDEBUG="${WINEDEBUG:-fixme-all}"
-exec "$WINE_BIN" "$EXE" "$@"
+# WSLg provides an X/Wayland display — run the Windows .exe via binfmt interop.
+exec "$EXE" "$@"
 LAUNCHER
 
 chmod 755 "$BIN_DIR/worldclock"
@@ -195,7 +190,7 @@ chmod 755 "$DEBIAN_DIR/postinst"
 find "$PKG_DIR" -type d -exec chmod 755 {} \;
 find "$PKG_DIR" -type f ! -name "worldclock" ! -name "postinst" \
     -exec chmod 644 {} \;
-# Ensure the Windows .exe is executable (Wine needs it)
+# Ensure the Windows .exe is executable for binfmt interop
 [ -f "$OPT_DIR/WorldClock.exe" ] && chmod 755 "$OPT_DIR/WorldClock.exe"
 
 # ── Step 9: Build the .deb ────────────────────────────────────────────────────
@@ -205,8 +200,92 @@ dpkg-deb --build --root-owner-group "$PKG_DIR" "$DEB_FILE"
 echo ""
 echo -e "\033[32m[OK] Package ready: $DEB_FILE\033[0m"
 echo ""
-echo "Install on Debian/Ubuntu/WSL2:"
+echo "Install on WSL2:"
 echo "  sudo dpkg -i \"$DEB_FILE\""
-echo "  sudo apt-get install -f          # installs Wine if missing"
 echo ""
 echo "Then run:  worldclock"
+
+# ── Step 10: Upload to GitHub Releases ────────────────────────────────────────
+if [ "$UPLOAD" = true ]; then
+    step "Uploading .deb to GitHub Releases ..."
+
+    # ── Validate prerequisites ────────────────────────────────────────────────
+    if [ -z "${GITHUB_TOKEN:-}" ]; then
+        echo "ERROR: GITHUB_TOKEN environment variable is not set." >&2
+        echo "  Set it with:  export GITHUB_TOKEN=ghp_..." >&2
+        exit 1
+    fi
+    if [ -z "$GITHUB_REPO" ]; then
+        echo "ERROR: Specify --repo OWNER/REPO or set the GITHUB_REPO environment variable." >&2
+        exit 1
+    fi
+
+    [ -z "$GITHUB_TAG" ] && GITHUB_TAG="v${VERSION}"
+
+    API="https://api.github.com/repos/${GITHUB_REPO}"
+    DEB_FILENAME="$(basename "$DEB_FILE")"
+    GH_HEADERS=(
+        -H "Authorization: Bearer ${GITHUB_TOKEN}"
+        -H "Accept: application/vnd.github+json"
+        -H "X-GitHub-Api-Version: 2022-11-28"
+    )
+
+    echo "  Tag: ${GITHUB_TAG}  |  Repo: ${GITHUB_REPO}"
+
+    # ── Look up release by tag (create if absent) ─────────────────────────────
+    RELEASE_JSON=$(curl -sf "${GH_HEADERS[@]}" \
+        "${API}/releases/tags/${GITHUB_TAG}" || true)
+
+    if [ -z "$RELEASE_JSON" ] || echo "$RELEASE_JSON" | grep -q '"Not Found"'; then
+        echo "  Release '${GITHUB_TAG}' not found — creating it ..."
+        RELEASE_JSON=$(curl -sSf -X POST "${GH_HEADERS[@]}" \
+            -H "Content-Type: application/json" \
+            -d "{\"tag_name\":\"${GITHUB_TAG}\",\"name\":\"WorldClock ${VERSION}\",\"body\":\"WorldClock ${VERSION}\",\"draft\":false,\"prerelease\":false}" \
+            "${API}/releases")
+    fi
+
+    RELEASE_ID=$(echo "$RELEASE_JSON" | python3 -c \
+        "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null || true)
+    if [ -z "$RELEASE_ID" ]; then
+        echo "ERROR: Could not determine release ID from GitHub response." >&2
+        echo "$RELEASE_JSON" >&2
+        exit 1
+    fi
+    echo "  Release ID: ${RELEASE_ID}"
+
+    # ── Delete existing asset with the same name (makes re-runs idempotent) ───
+    EXISTING_ID=$(echo "$RELEASE_JSON" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for a in data.get('assets', []):
+    if a['name'] == '${DEB_FILENAME}':
+        print(a['id'])
+        break
+" 2>/dev/null || true)
+
+    if [ -n "$EXISTING_ID" ]; then
+        echo "  Removing existing asset '${DEB_FILENAME}' (id=${EXISTING_ID}) ..."
+        curl -sSf -X DELETE "${GH_HEADERS[@]}" \
+            "${API}/releases/assets/${EXISTING_ID}"
+    fi
+
+    # ── Upload the .deb ───────────────────────────────────────────────────────
+    UPLOAD_URL="https://uploads.github.com/repos/${GITHUB_REPO}/releases/${RELEASE_ID}/assets"
+    echo "  Uploading ${DEB_FILENAME} ($(du -h "$DEB_FILE" | cut -f1)) ..."
+    ASSET_JSON=$(curl -sSf -X POST "${GH_HEADERS[@]}" \
+        -H "Content-Type: application/vnd.debian.binary-package" \
+        --data-binary "@${DEB_FILE}" \
+        "${UPLOAD_URL}?name=${DEB_FILENAME}&label=${DEB_FILENAME}")
+
+    ASSET_URL=$(echo "$ASSET_JSON" | python3 -c \
+        "import sys,json; print(json.load(sys.stdin)['browser_download_url'])" 2>/dev/null || true)
+
+    if [ -n "$ASSET_URL" ]; then
+        echo ""
+        echo -e "\033[32m[OK] Asset published: ${ASSET_URL}\033[0m"
+    else
+        echo "ERROR: Upload failed. Response:" >&2
+        echo "$ASSET_JSON" >&2
+        exit 1
+    fi
+fi
