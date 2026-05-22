@@ -40,13 +40,14 @@ Each theme defines six semantic colour slots:
 
 ---
 
-## Transparency / acrylic
+## Transparency
 
-The **Opacity** slider (0 % → 100 %) controls window transparency using Windows acrylic composition. At values below 100 % the desktop behind the window is blurred and blended with the active theme's background colour.
+The **Opacity** slider (0 % → 100 %) controls window transparency. On Windows, Avalonia uses the platform acrylic composition API to blur the desktop behind the window when transparency is enabled.
 
 - Changes apply **live** — drag the slider and see the effect immediately.
 - The setting persists across restarts.
-- On systems where acrylic is not available (some virtual machines, Remote Desktop sessions) the window falls back to a standard transparent background.
+- On Linux the window uses standard compositor transparency; blur effect availability depends on the desktop environment (e.g. KDE Plasma with blur plugin).
+- On systems where composition is not available (some virtual machines, Remote Desktop sessions) the window falls back to a solid background.
 
 ---
 
@@ -77,3 +78,5 @@ new AppTheme
 ```
 
 The new theme will appear in the Settings dropdown immediately without any further plumbing.
+
+> **Note:** Colours are pushed into Avalonia application resources by `ThemeService.Apply()`, which causes all `DynamicResource` bindings across the UI to update live without a restart.

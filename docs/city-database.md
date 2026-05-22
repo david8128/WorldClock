@@ -78,6 +78,19 @@ The generated CSV has a header row. Columns (0-based):
 
 `WorldCitySearchService` merges the CSV cities with the hand-curated `CityDatabase.All` list (covering the most common global cities out of the box). The merged, deduplicated list supports three match strategies:
 
+### Built-in UTC entry
+
+`CityDatabase.All` includes a dedicated UTC entry at the top of its list:
+
+```
+Display name : "UTC — Coordinated Universal Time"
+IANA timezone: UTC
+Search codes : UTC, Z, UCT
+Flag emoji   : 🌐
+```
+
+This means the UTC clock card is always searchable in the city picker, and its label, accent colour, and team label can be customised and will persist across restarts just like any other city card. The UTC card cannot be deleted.
+
 1. **Prefix match** on `City_Name` or `Country_Name` — highest priority.
 2. **Substring match** — for partial or mid-word queries.
 3. **IATA / code match** — typing `BOG`, `CDG`, or `SYD` returns Bogotá, Paris CDG, or Sydney instantly.

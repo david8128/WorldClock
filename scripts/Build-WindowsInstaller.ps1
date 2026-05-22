@@ -45,6 +45,10 @@
     Release tag to upload to (e.g. v1.2.3).
     Defaults to v<Version> when omitted.
 
+.PARAMETER GenerateIcons
+    Regenerate Logo.ico and hicolor PNGs by calling generate-icons.sh via WSL
+    before the build. Requires WSL with ImageMagick installed.
+
 .EXAMPLE
     # Build and upload to GitHub Releases
     $env:GITHUB_TOKEN = 'ghp_...'
@@ -63,7 +67,8 @@ param(
     [switch] $SkipPublish,
     [switch] $Upload,                   # push installer to a GitHub Release
     [string] $GitHubRepo    = '',       # OWNER/REPO  (or $env:GITHUB_REPO)
-    [string] $GitHubTag     = ''        # defaults to v$Version
+    [string] $GitHubTag     = '',       # defaults to v$Version
+    [switch] $GenerateIcons             # call generate-icons.sh via WSL first
 )
 
 Set-StrictMode -Version Latest
@@ -120,7 +125,25 @@ function Write-Step([string]$Message) {
     Write-Host "`n==> $Message" -ForegroundColor Cyan
 }
 
-# ── Step 1: Publish ────────────────────────────────────────────────────────────
+# ── Step 0: Regenerate icons via generate-icons.sh (optional) ─────────────────────
+if ($GenerateIcons) {
+    Write-Step 'Regenerating icons via generate-icons.sh (WSL) ...'
+    $IconScript  = Join-Path $RepoRoot 'scripts\generate-icons.sh'
+    $WslScriptPath = & wsl wslpath -u $IconScript 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($WslScriptPath)) {
+        Write-Error 'WSL is required for -GenerateIcons. Enable WSL and install ImageMagick inside it.'
+    }
+    & wsl bash $WslScriptPath.Trim()
+    if ($LASTEXITCODE -ne 0) { Write-Error "generate-icons.sh failed (exit $LASTEXITCODE)." }
+}
+
+# Verify Logo.ico exists (required by installer\WorldClock.iss SetupIconFile)
+$IcoPath = Join-Path $RepoRoot 'WorldClock\Images\Logo.ico'
+if (-not (Test-Path $IcoPath)) {
+    Write-Error "Logo.ico not found at $IcoPath.`n  Run:  bash scripts/generate-icons.sh"
+}
+
+# ── Step 1: Publish ───────────────────────────────────────────────────────────
 if (-not $SkipPublish) {
     Write-Step "Publishing WorldClock (self-contained, win-x64, single-file) ..."
 

@@ -8,6 +8,7 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AssemblyName>WorldClock</AssemblyName>
     <RootNamespace>WorldClock</RootNamespace>
+    <ApplicationIcon>Images/Logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

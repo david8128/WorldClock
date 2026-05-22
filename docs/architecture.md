@@ -1,6 +1,6 @@
 # Architecture
 
-WorldClock is a **.NET 8 WPF** application following the MVVM pattern with a few deliberate design choices that make it feel more like a design-canvas app than a traditional XAML form.
+WorldClock is a **.NET 10 + Avalonia 11.2.3** application following the MVVM pattern with a few deliberate design choices that make it feel more like a design-canvas app than a traditional UI form.
 
 ---
 
@@ -19,7 +19,7 @@ Window
 
 ### Why a fixed design canvas?
 
-- Pixel-perfect layouts without fighting with WPF's auto-layout in complex grid/canvas combos.
+- Pixel-perfect layouts without fighting Avalonia’s auto-layout in complex grid/canvas combos.
 - Uniform scaling means the UI looks identical at any monitor DPI or window size.
 - Adding a clock row grows `DesignRoot.Height` and `Window.Height` proportionally; the `Viewbox` re-scales automatically.
 
@@ -37,7 +37,7 @@ Two modes are available (toggled in Settings → Appearance):
 ## MVVM wiring
 
 ```
-MainWindow.xaml.cs
+MainWindow.axaml.cs
    └── DataContext = MainViewModel
          ├── ObservableCollection<ClockLocation>  ← clock panel ItemsSource
          └── TimeTranslatorViewModel  (Translator)
@@ -56,15 +56,15 @@ MainWindow.xaml.cs
 
 ### `ThemeService` (singleton)
 
-Holds the active `AppTheme` and transparency opacity. Calling `Apply()` pushes colour values into `Application.Current.Resources` so that all `DynamicResource` bindings update without re-rendering the full tree. Also exposes `EditMode` and `DeleteMode` booleans that drive the per-card overlay buttons.
+Holds the active `AppTheme` and transparency opacity. Calling `Apply()` pushes colour values into Avalonia application resources so that all `DynamicResource` bindings update without re-rendering the full tree. Also exposes `EditMode` and `DeleteMode` booleans that drive the per-card overlay buttons.
 
 ### `SettingsService` (singleton)
 
-Persists `UserSettings` as indented JSON to `%APPDATA%\WorldClock\settings.json`. Loaded once at startup; saved on every meaningful change (city add/remove, theme change, opacity change, home location change).
+Persists `UserSettings` as indented JSON to `%APPDATA%\WorldClock\settings.json` (Windows) or `~/.config/WorldClock/settings.json` (Linux). Loaded once at startup; saved on every meaningful change (city add/remove, theme change, opacity change, home location change).
 
 ### `WorldCitySearchService` (static)
 
-Thread-safe lazy loader that merges the curated `CityDatabase.All` list with the generated airport CSV (`world_cities_timezones.csv`) if present. Exposes a `Search(query, maxResults)` method with prefix, substring, and IATA-code matching.
+Thread-safe lazy loader that merges the curated `CityDatabase.All` list (which includes a built-in UTC entry searchable as `UTC`, `Z`, or `UCT`) with the generated airport CSV (`world_cities_timezones.csv`) if present. Exposes a `Search(query, maxResults)` method with prefix, substring, and IATA-code matching.
 
 ---
 
@@ -80,7 +80,15 @@ DispatcherTimer (1 s)
                └── DstLabel     ← "DST" / "STD"
 ```
 
-Each `ClockLocation` raises `INotifyPropertyChanged` on every update so WPF bindings refresh automatically.
+Each `ClockLocation` raises `INotifyPropertyChanged` on every update so Avalonia bindings refresh automatically.
+
+### UTC card
+
+The UTC clock location is always present (added at startup if absent from saved settings). Unlike other cards:
+
+- It **cannot be deleted** (`IsDeleteVisible` always returns `false` for UTC).
+- It **can be edited** in edit mode: the label, flag emoji, team label, and accent colour are all customisable and persist across restarts.
+- It is **searchable** in the city picker via the query strings `UTC`, `Z`, and `UCT`.
 
 ---
 
@@ -97,7 +105,16 @@ Horizontal positioning uses `SlotIndexToCanvasLeftConverter` which multiplies `S
 
 ## Mode proxies
 
-`EditModeProxy.Instance` and `DeleteModeProxy.Instance` are thin `INotifyPropertyChanged` singletons that forward `ThemeService.Instance.EditMode` / `.DeleteMode`. They exist because DataTemplates for clock cards have their own `DataContext` (`ClockLocation`), making it impossible to bind directly to `ThemeService` without a proxy or `RelativeSource` ancestor walk.
+`EditModeProxy.Instance` and `DeleteModeProxy.Instance` are thin `INotifyPropertyChanged` singletons that forward `ThemeService.Instance.EditMode` / `.DeleteMode`. They exist because DataTemplates for clock cards have their own `DataContext` (`ClockLocation`), making it impossible to bind directly to `ThemeService` without a proxy or ancestor lookup.
+
+---
+
+## Cross-platform notes
+
+- UI markup uses **`.axaml`** files (Avalonia XAML). Legacy `.xaml` files from the WPF era remain in the repository but are excluded from the build via `<Compile Remove>` directives in the `.csproj`.
+- Avalonia resolves boolean negation in bindings with `{Binding !BoolProp}` syntax (no `BooleanToVisibility` converter needed).
+- Settings are stored in `%APPDATA%\WorldClock\` on Windows and `~/.config/WorldClock/` on Linux; the path is resolved via `Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)`.
+- The `.csproj` targets `net10.0` (no `-windows` suffix), making the build portable across platforms without conditional logic.
 
 ---
 

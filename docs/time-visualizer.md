@@ -1,6 +1,6 @@
 # Time Visualizer
 
-The **Time Visualizer** is the right-hand panel of WorldClock. It renders a WTB-style 24-hour grid that makes it instantly clear which working hours overlap across your configured timezones.
+The **Time Visualizer** is the right-hand panel of WorldClock. It renders a WTB-style 24-hour grid that makes it instantly clear which working hours overlap across your configured timezones. It is built entirely with Avalonia UI controls and updates reactively via `INotifyPropertyChanged`.
 
 ![Time Visualizer grid](../images/wtbmca.png)
 

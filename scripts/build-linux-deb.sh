@@ -84,26 +84,19 @@ rm -rf "$PKG_DIR"
 OPT_DIR="$PKG_DIR/opt/worldclock"
 BIN_DIR="$PKG_DIR/usr/bin"
 DESKTOP_DIR="$PKG_DIR/usr/share/applications"
-ICON_DIR_256="$PKG_DIR/usr/share/icons/hicolor/256x256/apps"
-ICON_DIR_48="$PKG_DIR/usr/share/icons/hicolor/48x48/apps"
+ICONS_BASE="$PKG_DIR/usr/share/icons/hicolor"
 DOC_DIR="$PKG_DIR/usr/share/doc/worldclock"
 DEBIAN_DIR="$PKG_DIR/DEBIAN"
 
-mkdir -p "$OPT_DIR" "$BIN_DIR" "$DESKTOP_DIR" \
-         "$ICON_DIR_256" "$ICON_DIR_48" "$DOC_DIR" "$DEBIAN_DIR"
+mkdir -p "$OPT_DIR" "$BIN_DIR" "$DESKTOP_DIR" "$DOC_DIR" "$DEBIAN_DIR"
+HICOLOR_SIZES="16 22 24 32 36 48 64 72 96 128 192 256 512"
+for _sz in $HICOLOR_SIZES; do
+    mkdir -p "$ICONS_BASE/${_sz}x${_sz}/apps"
+done
 
 # Copy published app
 cp -r "$PUBLISH_DIR/." "$OPT_DIR/"
 
-# Copy icons
-cp "$REPO_ROOT/WorldClock/Images/Logo.png" "$ICON_DIR_256/worldclock.png"
-
-# Downscale to 48x48 if ImageMagick is available; otherwise copy as-is
-if command -v convert &>/dev/null; then
-    convert "$ICON_DIR_256/worldclock.png" -resize 48x48 "$ICON_DIR_48/worldclock.png"
-else
-    cp "$ICON_DIR_256/worldclock.png" "$ICON_DIR_48/worldclock.png"
-fi
 
 # ── Step 3: DEBIAN/control ────────────────────────────────────────────────────
 cat > "$DEBIAN_DIR/control" <<EOF

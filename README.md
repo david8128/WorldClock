@@ -1,8 +1,8 @@
 # WorldClock
 
-A sleek, frameless Windows desktop clock built with **.NET 8 + WPF**. Track time across any number of cities simultaneously, visualise a full-day 24-hour timeline across all your timezones at a glance, and customise every detail — from accent colours to acrylic transparency.
+A sleek, frameless desktop clock built with **.NET 10 + Avalonia 11**. Runs natively on **Windows and Linux**. Track time across any number of cities simultaneously, visualise a full-day 24-hour timeline across all your timezones at a glance, and customise every detail — from accent colours to transparency.
 
-![WorldClock application screenshot](images/WorldClock.png)
+![WorldClock application screenshot](images/Avalonia.png)
 
 ---
 
@@ -11,35 +11,41 @@ A sleek, frameless Windows desktop clock built with **.NET 8 + WPF**. Track time
 | Feature | Description |
 |---|---|
 | **Multi-city clocks** | Live, ticking clocks for as many cities as you need, each with a unique accent colour |
+| **UTC card** | Always-present UTC card is editable (rename, recolour), searchable in the city picker, and its state persists across restarts |
 | **Home location** | Mark one city as home — all other cards show their time difference relative to it |
 | **Time Visualizer** | WTB-style 24-hour grid that shows the full day (00:00 – 23:30) across every timezone simultaneously |
 | **+1 day detection** | The visualizer automatically highlights cells that belong to the next calendar day in orange |
-| **City search backed by airports** | Thousands of cities searchable by name, country, or IATA code |
+| **City search backed by airports** | Thousands of cities searchable by name, country, or IATA code — including `UTC` / `Z` / `UCT` |
 | **11 built-in themes** | Dark Default, Light Default, One Dark, Monokai, Solarized, Nord Dark, Tokyo Night, Catppuccin Mocha/Latte, Ariake Dark, and more |
-| **Acrylic / transparency** | Live opacity slider — see your desktop through the window |
+| **Transparency** | Live opacity slider — see your desktop through the window |
 | **Edit & Delete mode** | Always-visible mini-settings icons in the clock panel header |
 | **Stateful** | All cities, home location, theme, and opacity persist across restarts |
+| **Cross-platform** | Runs on Windows 10/11 and Linux (Debian/Ubuntu .deb package) |
 
 ---
 
 ## Prerequisites
 
-- **Windows 10 / 11** (WPF + Windows acrylic APIs)
-- **.NET 8 SDK** — [download](https://dotnet.microsoft.com/download/dotnet/8.0)
+### Windows
+- **Windows 10 / 11**
+- **.NET 10 SDK** — [download](https://dotnet.microsoft.com/download/dotnet/10.0)
+- **Inno Setup 6** (only for building the installer) — [download](https://jrsoftware.org/isdl.php)
+
+### Linux
+- **Debian / Ubuntu** (or any distro with `dpkg`)
+- **.NET 10 SDK** — [download](https://dotnet.microsoft.com/download/dotnet/10.0)
+- **ImageMagick** (only for regenerating icons) — `sudo apt install imagemagick`
 
 ---
 
 ## Getting started
 
-```powershell
+```bash
 # 1. Clone
-git clone https://github.com/your-org/worldclock.git
+git clone https://github.com/david8128/worldclock.git
 cd worldclock
 
-# 2. Build
-dotnet build WorldClock/WorldClock.csproj -c Release
-
-# 3. Run
+# 2. Run directly
 dotnet run --project WorldClock/WorldClock.csproj -c Release
 ```
 
@@ -47,9 +53,54 @@ The window is frameless — drag anywhere to move it. Use the **⚙** gear icon 
 
 ---
 
+## Building packages
+
+### Windows installer
+
+Requires **Inno Setup 6** and **PowerShell 7+**.
+
+```powershell
+# Build and optionally upload to GitHub Releases
+.\scripts\Build-WindowsInstaller.ps1
+.\scripts\Build-WindowsInstaller.ps1 -Upload -GitHubRepo david8128/worldclock
+
+# Regenerate icons before building (needs WSL + ImageMagick)
+.\scripts\Build-WindowsInstaller.ps1 -GenerateIcons -Upload -GitHubRepo david8128/worldclock
+```
+
+The installer is written to `installer/Output/WorldClockSetup.exe`.
+
+### Linux .deb package
+
+Run inside WSL2 (or any Debian/Ubuntu shell):
+
+```bash
+# Build and optionally upload to GitHub Releases
+bash scripts/build-linux-deb.sh
+bash scripts/build-linux-deb.sh --upload --repo david8128/worldclock
+```
+
+The `.deb` is written to `publish/linux-deb/`.
+
+### Icon pipeline
+
+Icons are pre-generated from `WorldClock/Images/Logo.png` and committed. To regenerate after changing the logo:
+
+```bash
+bash scripts/generate-icons.sh
+```
+
+This produces:
+- `WorldClock/Images/hicolor/<sz>x<sz>/worldclock.png` — 13 freedesktop hicolor sizes
+- `WorldClock/Images/Logo.ico` — multi-resolution Windows ICO (16 / 32 / 48 / 64 / 128 / 256 px)
+
+Requires **ImageMagick** (`convert`).
+
+---
+
 ## City database — powered by airport data
 
-![City search using airport IATA codes](images/selectionairports.png)
+![City search using airport IATA codes](images/Search.png)
 
 The city catalogue is derived from a **global airports dataset** (IATA / ICAO codes, timezone, GPS coordinates) published on [Kaggle by samvelkoch](https://www.kaggle.com/datasets/samvelkoch/global-airports-iata-icao-timezone-geo).
 
@@ -84,17 +135,29 @@ The window has no title bar. **Double-click** anywhere on the background to togg
 
 ```
 worldclock/
-├── WorldClock/                  # Main WPF application
+├── WorldClock/                  # Main Avalonia application
 │   ├── Data/                    # City search & airport CSV loader
-│   ├── Helpers/                 # Converters, theme helpers
+│   ├── Helpers/                 # Value converters, theme helpers
 │   ├── Models/                  # ClockLocation, AppTheme, TimeGrid*
 │   ├── Services/                # ThemeService, SettingsService
 │   ├── ViewModels/              # MainViewModel, TimeTranslatorViewModel
+│   ├── Images/                  # Logo.png, Logo.ico, hicolor/ icon tree
+│   ├── Assets/                  # Fonts (NotoColorEmoji)
 │   ├── citiesdb/                # Python pipeline to regenerate the city CSV
-│   ├── MainWindow.xaml/.cs      # Shell window
-│   └── SettingsWindow.xaml/.cs  # Settings panel
-├── WorldClock.Tests/            # xUnit test suite (205 tests)
+│   ├── Program.cs               # Avalonia app entry point
+│   ├── App.axaml / App.axaml.cs # Application definition
+│   ├── MainWindow.axaml/.cs     # Shell window
+│   ├── SettingsWindow.axaml/.cs # Settings panel
+│   ├── DiagnosticsWindow.axaml  # Diagnostics / debug panel
+│   └── Styles.axaml             # Shared control styles
+├── WorldClock.Tests/            # xUnit test suite
 ├── Features/                    # Gherkin feature files (living spec)
+├── scripts/
+│   ├── build-linux-deb.sh       # Builds Linux .deb + optional GitHub upload
+│   ├── Build-WindowsInstaller.ps1 # Builds Windows installer + optional GitHub upload
+│   └── generate-icons.sh        # Generates hicolor PNGs + Logo.ico from Logo.png
+├── installer/
+│   └── WorldClock.iss           # Inno Setup script
 ├── images/                      # Screenshots and reference images
 └── README.md
 ```
