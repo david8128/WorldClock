@@ -166,7 +166,7 @@
 
 | Priority | Item | Feature File | Effort |
 |----------|------|-------------|--------|
-| � Medium | Verify drag-and-drop card reorder on Windows target | `editable.feature` | — |
+| 🟠 Medium | Verify drag-and-drop card reorder on Windows target | `editable.feature` | — |
 | 🟠 Medium | Verify acrylic transparency on Windows | `lookandfeel.feature` | — |
 | 🟠 Medium | Verify custom window chrome (drag, resize) on Windows | — | — |
 | 🟡 Low | Verify app icon in Avalonia taskbar | `LogoIcon.feature` | Small |

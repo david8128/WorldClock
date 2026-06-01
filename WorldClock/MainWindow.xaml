@@ -55,7 +55,7 @@
             <Setter Property="Width"           Value="46"/>
             <Setter Property="Height"          Value="36"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground"      Value="{DynamicResource BrushTextDim}"/>
+            <Setter Property="Foreground"      Value="{DynamicResource BrushTextPrimary}"/>
             <Setter Property="FontFamily"      Value="Segoe UI"/>
             <Setter Property="FontSize"        Value="14"/>
             <Setter Property="Cursor"          Value="Hand"/>
@@ -63,6 +63,25 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="Transparent" CornerRadius="0">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WinMaximizeBtn" TargetType="Button" BasedOn="{StaticResource WinCtrlBtn}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
                         </Border>
@@ -77,21 +96,7 @@
         </Style>
 
         <Style x:Key="WinCloseBtn" TargetType="Button" BasedOn="{StaticResource WinCtrlBtn}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="Transparent" CornerRadius="0">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#C00C0C"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
         </Style>
 
         <!-- Compact TextBox for inline card editing -->
@@ -197,16 +202,26 @@
                         <Rectangle Width="1" Fill="{DynamicResource BrushSeparator}"
                                    Margin="6,8" VerticalAlignment="Stretch"/>
                         <Button Content="─" Style="{StaticResource WinCtrlBtn}"
+                            Foreground="{DynamicResource BrushTextPrimary}"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Click="MinimizeWindow_Click" ToolTip="Minimize"/>
                         <Button x:Name="MaximizeButton" Content="□"
-                                Style="{StaticResource WinCtrlBtn}"
+                                Style="{StaticResource WinMaximizeBtn}"
+                                Width="52" Height="40" FontSize="16"
+                                Foreground="{DynamicResource BrushTextPrimary}"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 Click="MaximizeWindow_Click" ToolTip="Maximize"/>
-                        <Button Content="✕" Style="{StaticResource WinCloseBtn}"
-                                Foreground="White"
+                        <Button Style="{StaticResource WinCtrlBtn}"
+                                Foreground="{DynamicResource BrushTextPrimary}"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
-                                Click="CloseWindow_Click" ToolTip="Close"/>
+                                Click="CloseWindow_Click" ToolTip="Close">
+                            <TextBlock Text="✕"
+                                       FontFamily="Segoe UI"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource BrushTextPrimary}"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"/>
+                        </Button>
                     </StackPanel>
                 </Grid>
             </Border>

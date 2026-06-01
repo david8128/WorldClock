@@ -69,6 +69,7 @@ if [ "$SKIP_PUBLISH" = false ]; then
         -r win-x64 \
         --self-contained true \
         "-p:VersionPrefix=$VERSION" \
+        "-p:NuGetAudit=false" \
         -o "$PUBLISH_DIR" \
         --nologo
 else

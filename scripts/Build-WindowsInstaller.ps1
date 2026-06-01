@@ -261,19 +261,60 @@ if ($Upload) {
     $Existing = $Release.assets | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1
     if ($Existing) {
         Write-Host "    Removing existing asset '$AssetName' (id=$($Existing.id)) ..." -ForegroundColor Gray
-        Invoke-RestMethod -Uri "$ApiBase/releases/assets/$($Existing.id)" `
-            -Headers $Headers -Method Delete | Out-Null
+        try {
+            Invoke-RestMethod -Uri "$ApiBase/releases/assets/$($Existing.id)" `
+                -Headers $Headers -Method Delete -ErrorAction Stop | Out-Null
+        } catch {
+            # GitHub may return 404 here if the asset was already removed or token visibility is limited.
+            # Do not hard-fail yet; upload logic below will retry conflict handling if needed.
+            if ($_.Exception.Message -match '404|Not Found') {
+                Write-Warning "Asset delete returned 404 for id=$($Existing.id). Continuing with upload attempt."
+            } else {
+                throw
+            }
+        }
     }
 
     # ── Upload the installer ─────────────────────────────────────────────────
-    $UploadUri  = "https://uploads.github.com/repos/$GitHubRepo/releases/$($Release.id)/assets"
+    $UploadUri = if ($Release.upload_url) {
+        ($Release.upload_url -replace '\{\?name,label\}$', '')
+    } else {
+        "https://uploads.github.com/repos/$GitHubRepo/releases/$($Release.id)/assets"
+    }
+    $EncodedAssetName = [System.Uri]::EscapeDataString($AssetName)
+    $UploadUriWithQuery = "${UploadUri}?name=$EncodedAssetName&label=$EncodedAssetName"
     $FileSizeMB = (Get-Item $InstallerPath).Length / 1MB
     Write-Host ("    Uploading $AssetName ({0:N1} MB) ..." -f $FileSizeMB) -ForegroundColor Gray
 
-    $Asset = Invoke-RestMethod -Uri "${UploadUri}?name=$AssetName&label=$AssetName" `
-                 -Headers $Headers -Method Post `
-                 -ContentType 'application/octet-stream' `
-                 -InFile $InstallerPath
+    $Asset = $null
+    try {
+        $Asset = Invoke-RestMethod -Uri $UploadUriWithQuery `
+                     -Headers $Headers -Method Post `
+                     -ContentType 'application/octet-stream' `
+                     -InFile $InstallerPath -ErrorAction Stop
+    } catch {
+        # Common rerun case: old asset still exists and upload returns HTTP 422 already_exists.
+        if ($_.Exception.Message -match '422|already_exists|already exists') {
+            Write-Warning "Upload conflict for '$AssetName'. Refreshing assets and retrying once."
+            $Assets = Invoke-RestMethod -Uri "$ApiBase/releases/$($Release.id)/assets" `
+                        -Headers $Headers -Method Get -ErrorAction Stop
+            $SameName = $Assets | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1
+            if ($SameName) {
+                Write-Host "    Removing conflicting asset '$AssetName' (id=$($SameName.id)) ..." -ForegroundColor Gray
+                Invoke-RestMethod -Uri "$ApiBase/releases/assets/$($SameName.id)" `
+                    -Headers $Headers -Method Delete -ErrorAction Stop | Out-Null
+            }
+
+            $Asset = Invoke-RestMethod -Uri $UploadUriWithQuery `
+                         -Headers $Headers -Method Post `
+                         -ContentType 'application/octet-stream' `
+                         -InFile $InstallerPath -ErrorAction Stop
+        } elseif ($_.Exception.Message -match '404|Not Found') {
+            throw "GitHub upload endpoint returned 404. Release lookup worked, so this is usually token permission scope on asset upload/delete. Use a token with repository Contents write access for $GitHubRepo and retry. Upload URI: $UploadUri"
+        } else {
+            throw
+        }
+    }
 
     Write-Host ''
     Write-Host "[OK] Asset published: $($Asset.browser_download_url)" -ForegroundColor Green

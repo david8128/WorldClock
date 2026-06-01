@@ -1,0 +1,23 @@
+# Normalise line endings on commit.
+# Windows contributors get CRLF in their working tree; Linux/macOS get LF.
+* text=auto
+
+# Shell scripts must always be LF — CRLF breaks bash/sh on Linux.
+*.sh    text eol=lf
+
+# Inno Setup script — Windows-only, keep CRLF.
+*.iss   text eol=crlf
+
+# PowerShell — Windows-only, keep CRLF.
+*.ps1   text eol=crlf
+*.psm1  text eol=crlf
+*.psd1  text eol=crlf
+
+# Binary files — never touch line endings.
+*.ico   binary
+*.png   binary
+*.jpg   binary
+*.gif   binary
+*.pdf   binary
+*.dll   binary
+*.exe   binary

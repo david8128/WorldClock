@@ -38,8 +38,8 @@
                         Width="28" Height="22"
                         BorderThickness="0"
                         Background="Transparent"
-                        Foreground="#FFFF00"
-                        FontSize="11"
+                        Foreground="{DynamicResource BrushTextPrimary}"
+                        FontSize="14"
                         Cursor="Hand"
                         Click="CloseButton_Click">
                     <Button.Style>
@@ -53,13 +53,13 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#C00C0C"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
                                 </Setter.Value>
                             </Setter>
-                            <Setter Property="Foreground" Value="#FFFF00"/>
+                            <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
                             <Setter Property="Cursor"     Value="Hand"/>
                         </Style>
                     </Button.Style>

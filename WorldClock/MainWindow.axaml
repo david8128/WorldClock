@@ -69,20 +69,37 @@
                                             Foreground="{DynamicResource BrushAccentCyan}"
                                             Cursor="Hand" ToolTip.Tip="Open Settings"
                                             Click="SettingsButton_Click"/>
-                                    <Button Content="─" Width="46" Height="36"
+                                        <Button Content="─" Width="52" Height="40"
                                             Background="Transparent" BorderThickness="0"
-                                            Foreground="{DynamicResource BrushTextDim}"
+                                            Foreground="{DynamicResource BrushTextPrimary}"
+                                            FontSize="16"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            Padding="0"
                                             Cursor="Hand"
                                             Click="MinimizeWindow_Click"/>
-                                    <Button Content="□" Width="46" Height="36"
+                                        <Button Content="◻" Width="52" Height="40"
                                             Background="Transparent" BorderThickness="0"
-                                            Foreground="{DynamicResource BrushTextDim}"
+                                            Foreground="{DynamicResource BrushTextPrimary}"
+                                            FontSize="16"
+                                            CornerRadius="6"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            Padding="0"
                                             Cursor="Hand"
                                             Click="MaximizeWindow_Click"/>
-                                    <Button Content="✕" Width="46" Height="36"
+                                        <Button Width="46" Height="36"
                                             Background="Transparent" BorderThickness="0"
-                                            Foreground="White" Cursor="Hand"
-                                            Click="CloseWindow_Click"/>
+                                            Foreground="{DynamicResource BrushTextPrimary}"
+                                            Cursor="Hand"
+                                            Click="CloseWindow_Click">
+                                        <TextBlock Text="✕"
+                                               FontFamily="Segoe UI"
+                                               FontSize="14"
+                                               Foreground="{DynamicResource BrushTextPrimary}"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Center"/>
+                                        </Button>
                                 </StackPanel>
                             </Grid>
                         </Border>
